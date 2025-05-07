@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import VideoPlayer from "@/components/trainings/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, Clock, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Users, Loader } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
@@ -79,6 +79,7 @@ const TrainingDetail = () => {
       <Layout>
         <div className="container mx-auto py-6">
           <div className="text-center py-12">
+            <Loader className="h-6 w-6 text-gray-400 animate-spin mx-auto mb-2" />
             <p>Carregando treinamento...</p>
           </div>
         </div>
@@ -198,9 +199,9 @@ const TrainingDetail = () => {
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-medium mb-4">Seu progresso</h3>
               
-              <div className="progress-bar mb-2">
+              <div className="progress-bar mb-2 bg-gray-200 rounded-full overflow-hidden h-2">
                 <div 
-                  className="progress-bar-fill bg-taggui-primary" 
+                  className="progress-bar-fill bg-taggui-primary h-full rounded-full" 
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
@@ -209,7 +210,7 @@ const TrainingDetail = () => {
                 <span className="font-medium">{Math.round(progress)}%</span>
               </div>
               
-              {progress >= 100 ? (
+              {progress >= 95 ? (
                 <div className="mt-4 text-center">
                   <div className="inline-block p-2 bg-green-100 text-green-800 rounded-full mb-2">
                     ✓

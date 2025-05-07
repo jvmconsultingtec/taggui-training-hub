@@ -1,12 +1,15 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Upload, X, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Upload, X, AlertTriangle, Loader } from "lucide-react";
 import Layout from "../components/layout/Layout";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
+import { createTraining, uploadTrainingVideo } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 
 const TrainingForm = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form state
@@ -56,54 +59,87 @@ const TrainingForm = () => {
     }
   };
   
-  // Simulate file upload progress
-  const simulateUpload = () => {
+  // Handle file upload
+  const handleUpload = async () => {
     if (!uploadFile) return;
     
-    setIsUploading(true);
-    setUploadProgress(0);
-    
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        const newProgress = prev + 10;
-        
-        if (newProgress >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          setFormData(prev => ({ 
-            ...prev, 
-            videoUrl: URL.createObjectURL(uploadFile) 
-          }));
-          return 100;
-        }
-        
-        return newProgress;
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      // Set up progress tracking
+      const interval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(interval);
+            return 95;
+          }
+          return prev + 5;
+        });
+      }, 300);
+      
+      // Perform actual upload to Supabase storage
+      const videoUrl = await uploadTrainingVideo(uploadFile);
+      
+      // Complete the progress bar
+      clearInterval(interval);
+      setUploadProgress(100);
+      setFormData(prev => ({ ...prev, videoUrl }));
+      
+      toast({
+        title: "Upload concluído",
+        description: "O vídeo foi carregado com sucesso!"
       });
-    }, 500);
+    } catch (error) {
+      console.error("Erro no upload do vídeo:", error);
+      toast({
+        title: "Erro no upload",
+        description: "Não foi possível fazer o upload do vídeo. Por favor, tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
   
   // Submit the form
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate form
     if (!formData.title) {
-      toast.error("Por favor, informe um título para o treinamento.");
+      toast({
+        title: "Dados incompletos",
+        description: "Por favor, informe um título para o treinamento.",
+        variant: "destructive"
+      });
       return;
     }
     
     if (formData.videoType === "YOUTUBE" && !formData.videoUrl) {
-      toast.error("Por favor, informe o link do vídeo no YouTube.");
+      toast({
+        title: "Dados incompletos",
+        description: "Por favor, informe o link do vídeo no YouTube.",
+        variant: "destructive"
+      });
       return;
     }
     
     if (formData.videoType === "UPLOAD" && !formData.videoUrl) {
-      toast.error("Por favor, faça o upload de um vídeo.");
+      toast({
+        title: "Dados incompletos",
+        description: "Por favor, faça o upload de um vídeo.",
+        variant: "destructive"
+      });
       return;
     }
     
     if (!formData.durationMin) {
-      toast.error("Por favor, informe a duração do treinamento.");
+      toast({
+        title: "Dados incompletos",
+        description: "Por favor, informe a duração do treinamento.",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -112,17 +148,40 @@ const TrainingForm = () => {
     
     setIsSubmitting(true);
     
-    // Simulate API call to save the training
-    setTimeout(() => {
-      toast.success("Treinamento criado com sucesso!");
-      setIsSubmitting(false);
+    try {
+      // Real API call to save the training
+      await createTraining({
+        title: formData.title,
+        description: formData.description,
+        video_type: formData.videoType as "YOUTUBE" | "UPLOAD",
+        video_url: formData.videoUrl,
+        duration_min: parseInt(formData.durationMin),
+        tags: filteredTags.length > 0 ? filteredTags : null,
+        company_id: user?.company_id || ""
+      });
+      
+      toast({
+        title: "Sucesso!",
+        description: "Treinamento criado com sucesso!"
+      });
+      
+      // Redirect after successful creation
       navigate("/trainings");
-    }, 1500);
+    } catch (error) {
+      console.error("Erro ao criar treinamento:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível criar o treinamento. Por favor, tente novamente mais tarde.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto py-6">
         <button 
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-gray-600 hover:text-taggui-primary mb-6"
@@ -252,6 +311,7 @@ const TrainingForm = () => {
                             accept="video/*"
                             className="sr-only"
                             onChange={handleFileChange}
+                            disabled={isUploading}
                           />
                         </label>
                         <p className="pl-1">ou arraste e solte</p>
@@ -268,8 +328,13 @@ const TrainingForm = () => {
                         </span>
                         <button
                           type="button"
-                          onClick={() => setUploadFile(null)}
+                          onClick={() => {
+                            setUploadFile(null);
+                            setUploadProgress(0);
+                            setFormData(prev => ({ ...prev, videoUrl: "" }));
+                          }}
                           className="text-gray-400 hover:text-gray-500"
+                          disabled={isUploading}
                         >
                           <X size={16} />
                         </button>
@@ -278,7 +343,7 @@ const TrainingForm = () => {
                       {!isUploading && uploadProgress === 0 && (
                         <button
                           type="button"
-                          onClick={simulateUpload}
+                          onClick={handleUpload}
                           className="mt-2 taggui-btn-outline text-sm"
                         >
                           Iniciar upload
@@ -296,7 +361,7 @@ const TrainingForm = () => {
                           <div className="mt-1 flex justify-between text-xs">
                             <span>{uploadProgress}%</span>
                             <span>
-                              {isUploading ? "Enviando..." : "Upload completo"}
+                              {isUploading ? "Enviando..." : uploadProgress === 100 ? "Upload completo" : "Processando..."}
                             </span>
                           </div>
                         </div>
@@ -350,6 +415,7 @@ const TrainingForm = () => {
               type="button"
               onClick={() => navigate(-1)}
               className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              disabled={isSubmitting}
             >
               Cancelar
             </button>
@@ -357,9 +423,14 @@ const TrainingForm = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="taggui-btn-primary"
+              className="taggui-btn-primary flex items-center gap-2"
             >
-              {isSubmitting ? "Salvando..." : "Salvar Treinamento"}
+              {isSubmitting ? (
+                <>
+                  <Loader size={16} className="animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : "Salvar Treinamento"}
             </button>
           </div>
         </form>

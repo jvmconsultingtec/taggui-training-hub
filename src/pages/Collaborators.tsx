@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { fetchCompanyUsers } from "@/services/api";
-import { AlertCircle, Search, SortAsc, SortDesc, Filter } from "lucide-react";
+import { AlertCircle, Search, SortAsc, SortDesc, Filter, Loader } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   DropdownMenu, 
@@ -44,6 +44,7 @@ const Collaborators = () => {
         setLoading(true);
         setError(null);
         const data = await fetchCompanyUsers();
+        console.log("Fetched users:", data);
         setUsers(data);
         setFilteredUsers(data);
       } catch (err: any) {
@@ -141,6 +142,8 @@ const Collaborators = () => {
     setFilterRole(null);
   };
 
+  const showEmptyData = !loading && filteredUsers.length === 0;
+
   return (
     <Layout>
       <div className="container mx-auto py-6 space-y-8">
@@ -228,7 +231,10 @@ const Collaborators = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8">Carregando colaboradores...</div>
+              <div className="text-center py-8">
+                <Loader className="h-6 w-6 text-gray-400 animate-spin mx-auto mb-2" />
+                <p>Carregando colaboradores...</p>
+              </div>
             ) : filteredUsers.length > 0 ? (
               <div className="space-y-4">
                 <div className="hidden md:flex text-xs text-muted-foreground mb-2 px-4">
@@ -272,6 +278,13 @@ const Collaborators = () => {
                   <Button variant="outline" className="mt-4" onClick={clearFilters}>
                     Limpar filtros
                   </Button>
+                )}
+                {!searchQuery.trim() && !filterRole && showEmptyData && (
+                  <div className="mt-4 p-4 bg-amber-50 text-amber-800 rounded-md max-w-md mx-auto">
+                    <p className="text-sm font-medium">
+                      Não há colaboradores cadastrados nesta conta. Você precisa adicionar colaboradores primeiro.
+                    </p>
+                  </div>
                 )}
               </div>
             )}

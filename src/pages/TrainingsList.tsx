@@ -1,107 +1,28 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { PlusCircle, Filter, Search, MoreVertical, Edit, Trash2, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { PlusCircle, Filter, Search, MoreVertical, Edit, Trash2, Users, Loader } from "lucide-react";
 import Layout from "../components/layout/Layout";
+import { fetchTrainings } from "@/services/api";
+import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Mock data for trainings
-const mockTrainings = [
-  {
-    id: "1",
-    title: "Onboarding: Conheça a Empresa",
-    description: "Um treinamento completo sobre nossa história, valores e cultura.",
-    videoType: "YOUTUBE",
-    createdAt: "2025-04-01T10:30:00Z",
-    durationMin: 15,
-    author: "RH",
-    assigned: 38,
-    completed: 22,
-    completionRate: 58,
-    tags: ["Onboarding", "Obrigatório"]
-  },
-  {
-    id: "2",
-    title: "Segurança da Informação",
-    description: "Aprenda as melhores práticas para proteger dados sensíveis.",
-    videoType: "UPLOAD",
-    createdAt: "2025-04-05T14:20:00Z",
-    durationMin: 25,
-    author: "TI",
-    assigned: 156,
-    completed: 130,
-    completionRate: 83,
-    tags: ["Segurança", "TI", "Obrigatório"]
-  },
-  {
-    id: "3",
-    title: "Treinamento em Diversidade e Inclusão",
-    description: "Como criar um ambiente de trabalho inclusivo e respeitoso.",
-    videoType: "YOUTUBE",
-    createdAt: "2025-04-10T09:15:00Z",
-    durationMin: 30,
-    author: "RH",
-    assigned: 156,
-    completed: 110,
-    completionRate: 71,
-    tags: ["Soft Skills", "Cultura"]
-  },
-  {
-    id: "4", 
-    title: "Comunicação Efetiva",
-    description: "Técnicas para melhorar sua comunicação no ambiente de trabalho.",
-    videoType: "YOUTUBE",
-    createdAt: "2025-04-12T11:45:00Z",
-    durationMin: 40,
-    author: "Comunicação",
-    assigned: 45,
-    completed: 29,
-    completionRate: 64,
-    tags: ["Soft Skills", "Comunicação"]
-  },
-  {
-    id: "5",
-    title: "Excel Avançado",
-    description: "Domine fórmulas avançadas e análise de dados no Excel.",
-    videoType: "UPLOAD",
-    createdAt: "2025-04-15T13:00:00Z",
-    durationMin: 60,
-    author: "TI",
-    assigned: 32,
-    completed: 19,
-    completionRate: 59,
-    tags: ["Excel", "Ferramentas", "Análise"]
-  },
-  {
-    id: "6",
-    title: "Gestão de Tempo",
-    description: "Aprenda técnicas para gerenciar melhor seu tempo e aumentar a produtividade.",
-    videoType: "YOUTUBE",
-    createdAt: "2025-04-18T09:30:00Z",
-    durationMin: 35,
-    author: "RH",
-    assigned: 78,
-    completed: 42,
-    completionRate: 54,
-    tags: ["Produtividade", "Soft Skills"]
-  },
-  {
-    id: "7",
-    title: "Marketing Digital",
-    description: "Fundamentos de marketing digital e estratégias eficazes.",
-    videoType: "UPLOAD",
-    createdAt: "2025-04-20T15:00:00Z",
-    durationMin: 55,
-    author: "Marketing",
-    assigned: 25,
-    completed: 18,
-    completionRate: 72,
-    tags: ["Marketing", "Digital"]
-  }
-];
+type Training = {
+  id: string;
+  title: string;
+  description: string | null;
+  video_type: "YOUTUBE" | "UPLOAD";
+  video_url: string;
+  duration_min: number;
+  created_at: string;
+  tags: string[] | null;
+  company_id: string;
+};
 
 // Dropdown menu component for table actions
-const ActionsMenu = () => {
+const ActionsMenu = ({ id }: { id: string }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
   
   return (
     <div className="relative">
@@ -114,27 +35,27 @@ const ActionsMenu = () => {
       
       {isOpen && (
         <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
-          <Link 
-            to="#" 
-            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          <button 
+            onClick={() => navigate(`/trainings/edit/${id}`)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
           >
             <Edit size={14} />
             <span>Editar</span>
-          </Link>
-          <Link 
-            to="#" 
-            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          </button>
+          <button 
+            onClick={() => navigate(`/trainings/assign/${id}`)} 
+            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
           >
             <Users size={14} />
             <span>Atribuir</span>
-          </Link>
-          <Link 
-            to="#" 
-            className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+          </button>
+          <button 
+            onClick={() => alert('Funcionalidade em desenvolvimento')} 
+            className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
           >
             <Trash2 size={14} />
             <span>Excluir</span>
-          </Link>
+          </button>
         </div>
       )}
     </div>
@@ -142,25 +63,58 @@ const ActionsMenu = () => {
 };
 
 const TrainingsList = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [trainings, setTrainings] = useState<Training[]>([]);
+  const [filteredTrainings, setFilteredTrainings] = useState<Training[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadTrainings = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchTrainings();
+        setTrainings(data);
+        setFilteredTrainings(data);
+      } catch (err) {
+        console.error("Erro ao carregar treinamentos:", err);
+        setError("Não foi possível carregar os treinamentos. Por favor, tente novamente mais tarde.");
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os treinamentos",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTrainings();
+  }, []);
   
   // Get all unique tags from trainings
   const allTags = Array.from(
-    new Set(mockTrainings.flatMap(training => training.tags))
+    new Set(trainings.flatMap(training => training.tags || []))
   );
   
   // Filter trainings based on search query and tags
-  const filteredTrainings = mockTrainings.filter(training => {
-    const matchesSearch = !searchQuery || 
-      training.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      training.description.toLowerCase().includes(searchQuery.toLowerCase());
-      
-    const matchesTags = filterTags.length === 0 || 
-      filterTags.some(tag => training.tags.includes(tag));
-      
-    return matchesSearch && matchesTags;
-  });
+  useEffect(() => {
+    const filtered = trainings.filter(training => {
+      const matchesSearch = !searchQuery || 
+        training.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (training.description && training.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        
+      const matchesTags = filterTags.length === 0 || 
+        (training.tags && filterTags.some(tag => training.tags?.includes(tag)));
+        
+      return matchesSearch && matchesTags;
+    });
+    
+    setFilteredTrainings(filtered);
+  }, [searchQuery, filterTags, trainings]);
   
   // Toggle tag filter
   const toggleTag = (tag: string) => {
@@ -176,11 +130,21 @@ const TrainingsList = () => {
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR');
   };
+
+  const getAssignmentInfo = (training: Training) => {
+    // For demonstration purposes only
+    // In a real implementation, this would come from the API
+    return {
+      assigned: Math.floor(Math.random() * 100) + 20,
+      completed: Math.floor(Math.random() * 80),
+      completionRate: Math.floor(Math.random() * 100)
+    };
+  };
   
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Treinamentos</h1>
           
           <Link to="/trainings/new" className="taggui-btn-primary flex items-center gap-2">
@@ -189,8 +153,15 @@ const TrainingsList = () => {
           </Link>
         </div>
         
+        {error && (
+          <Alert variant="destructive">
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         {/* Filters and search */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <input 
@@ -238,89 +209,109 @@ const TrainingsList = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTrainings.map((training) => (
-                  <tr key={training.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Link 
-                        to={`/trainings/${training.id}`} 
-                        className="font-medium text-gray-900 hover:text-taggui-primary"
-                      >
-                        {training.title}
-                      </Link>
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-1">{training.description}</p>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {formatDate(training.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {training.durationMin} min
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {training.author}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${
-                              training.completionRate > 80 ? "bg-green-500" : 
-                              training.completionRate > 50 ? "bg-amber-500" : "bg-red-500"
-                            }`}
-                            style={{ width: `${training.completionRate}%` }}
-                          ></div>
-                        </div>
-                        <span className="ml-2 text-xs font-medium">{training.completionRate}%</span>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex items-center justify-center">
+                        <Loader className="h-6 w-6 text-gray-400 animate-spin mr-2" />
+                        <span>Carregando treinamentos...</span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {training.completed}/{training.assigned} concluídos
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-wrap gap-1">
-                        {training.tags.map((tag, index) => (
-                          <span 
-                            key={index}
-                            className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-600"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <ActionsMenu />
                     </td>
                   </tr>
-                ))}
+                ) : filteredTrainings.length > 0 ? (
+                  filteredTrainings.map((training) => {
+                    const { assigned, completed, completionRate } = getAssignmentInfo(training);
+                    
+                    return (
+                      <tr key={training.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Link 
+                            to={`/trainings/${training.id}`} 
+                            className="font-medium text-gray-900 hover:text-taggui-primary"
+                          >
+                            {training.title}
+                          </Link>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-1">{training.description}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {formatDate(training.created_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {training.duration_min} min
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {training.id.startsWith("1") ? "RH" : 
+                           training.id.startsWith("2") ? "TI" : 
+                           training.id.startsWith("3") ? "Comunicação" : 
+                           training.id.startsWith("4") ? "Marketing" : "Geral"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  completionRate > 80 ? "bg-green-500" : 
+                                  completionRate > 50 ? "bg-amber-500" : "bg-red-500"
+                                }`}
+                                style={{ width: `${completionRate}%` }}
+                              ></div>
+                            </div>
+                            <span className="ml-2 text-xs font-medium">{completionRate}%</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {completed}/{assigned} concluídos
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1">
+                            {training.tags && training.tags.map((tag, index) => (
+                              <span 
+                                key={index}
+                                className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-600"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <ActionsMenu id={training.id} />
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <p className="text-gray-500">Nenhum treinamento encontrado.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
           
-          {filteredTrainings.length === 0 && (
-            <div className="py-8 text-center">
-              <p className="text-gray-500">Nenhum treinamento encontrado.</p>
+          {/* Pagination would go here in a real app */}
+          {!loading && filteredTrainings.length > 0 && (
+            <div className="py-3 px-6 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                Mostrando <span className="font-medium">{filteredTrainings.length}</span> de <span className="font-medium">{trainings.length}</span> treinamentos
+              </div>
+              
+              {/* Simple pagination - would be more robust in a real app */}
+              <div className="flex gap-2">
+                <button className="px-3 py-1 rounded border border-gray-200 text-sm disabled:opacity-50">
+                  Anterior
+                </button>
+                <button className="px-3 py-1 rounded border border-gray-200 text-sm bg-gray-50">
+                  1
+                </button>
+                <button className="px-3 py-1 rounded border border-gray-200 text-sm disabled:opacity-50">
+                  Próximo
+                </button>
+              </div>
             </div>
           )}
-          
-          {/* Pagination would go here in a real app */}
-          <div className="py-3 px-6 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              Mostrando <span className="font-medium">{filteredTrainings.length}</span> de <span className="font-medium">{mockTrainings.length}</span> treinamentos
-            </div>
-            
-            {/* Simple pagination - would be more robust in a real app */}
-            <div className="flex gap-2">
-              <button className="px-3 py-1 rounded border border-gray-200 text-sm disabled:opacity-50">
-                Anterior
-              </button>
-              <button className="px-3 py-1 rounded border border-gray-200 text-sm bg-gray-50">
-                1
-              </button>
-              <button className="px-3 py-1 rounded border border-gray-200 text-sm disabled:opacity-50">
-                Próximo
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </Layout>
