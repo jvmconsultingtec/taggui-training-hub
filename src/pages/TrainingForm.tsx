@@ -1,15 +1,16 @@
 
-import { useState, useEffect, FormEvent, ChangeEvent } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { fetchTrainingById, createTraining, updateTraining, uploadTrainingVideo } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
-import { createTraining, fetchTrainingById, updateTraining, uploadTrainingVideo } from "@/services/api";
 import { ArrowLeft, Upload, Loader, Plus, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,10 +22,10 @@ type Visibility = Database["public"]["Enums"]["visibility"];
 
 const TrainingForm = () => {
   const navigate = useNavigate();
-  const { user, session } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Form state
+  const { id } = useParams();
+  const { user } = useAuth();
+  const isEditMode = Boolean(id);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -40,31 +41,25 @@ const TrainingForm = () => {
   
   // File state
   const [file, setFile] = useState<File | null>(null);
+  
+  // Loading states
+  const [loading, setLoading] = useState(isEditMode);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
   
-  // Form validation state
-  const [errors, setErrors] = useState({
-    title: "",
-    videoUrl: "",
-    durationMin: ""
-  });
-  
-  // Edit mode
-  const { id } = useParams();
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const isEditMode = !!id;
-  
-  // Load training data if in edit mode
+  // Fetch training if in edit mode
   useEffect(() => {
-    const loadTraining = async () => {
-      if (isEditMode && id) {
+    if (isEditMode && id) {
+      const getTraining = async () => {
         try {
           setLoading(true);
+          setError(null);
+          
           const training = await fetchTrainingById(id);
           
           if (training) {
+            // Set form data from training
             setFormData({
               title: training.title || "",
               description: training.description || "",
@@ -79,29 +74,37 @@ const TrainingForm = () => {
               setTags(training.tags);
             }
           } else {
-            setLoadError("Treinamento não encontrado.");
+            setError("Treinamento não encontrado");
           }
-        } catch (error: any) {
-          console.error("Erro ao carregar treinamento:", error);
-          setLoadError(error.message || "Erro ao carregar dados do treinamento");
+        } catch (err: any) {
+          console.error("Error fetching training:", err);
+          setError(`Erro ao carregar treinamento: ${err.message || "Erro desconhecido"}`);
         } finally {
           setLoading(false);
         }
-      }
-    };
-    
-    loadTraining();
+      };
+      
+      getTraining();
+    }
   }, [id, isEditMode]);
   
-  // Handle input changes
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Handle text field changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when field is edited
-    if (name in errors) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
+  };
+  
+  // Add tag to list
+  const handleAddTag = () => {
+    if (formData.tag.trim() && !tags.includes(formData.tag.trim())) {
+      setTags(prev => [...prev, formData.tag.trim()]);
+      setFormData(prev => ({ ...prev, tag: "" }));
     }
+  };
+  
+  // Remove tag from list
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(prev => prev.filter(tag => tag !== tagToRemove));
   };
   
   // Handle radio button changes
@@ -118,123 +121,81 @@ const TrainingForm = () => {
   };
   
   // Handle file changes
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
     }
   };
   
-  // Add tag to list
-  const addTag = () => {
-    const tagValue = formData.tag.trim();
-    
-    if (tagValue && !tags.includes(tagValue)) {
-      setTags([...tags, tagValue]);
-      setFormData(prev => ({ ...prev, tag: "" }));
-    }
-  };
-  
-  // Remove tag from list
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-  
-  // Filter out empty tags
-  const filteredTags = tags.filter(tag => tag.trim() !== "");
-  
-  // Validate form
-  const validateForm = () => {
-    const newErrors = {
-      title: "",
-      videoUrl: "",
-      durationMin: ""
-    };
-    
-    let isValid = true;
-    
-    if (!formData.title.trim()) {
-      newErrors.title = "O título é obrigatório";
-      isValid = false;
-    }
-    
-    if (formData.videoType === "YOUTUBE" && !formData.videoUrl.trim()) {
-      newErrors.videoUrl = "A URL do vídeo é obrigatória";
-      isValid = false;
-    }
-    
-    if (formData.videoType === "UPLOAD" && !file && !formData.videoUrl) {
-      newErrors.videoUrl = "Por favor, selecione um vídeo para upload";
-      isValid = false;
-    }
-    
-    const duration = parseInt(formData.durationMin);
-    if (isNaN(duration) || duration <= 0) {
-      newErrors.durationMin = "A duração deve ser um número maior que zero";
-      isValid = false;
-    }
-    
-    setErrors(newErrors);
-    return isValid;
-  };
-  
   // Handle form submission
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
     try {
-      // Get company_id from user metadata or session
-      let companyId = "00000000-0000-0000-0000-000000000000";
+      setSubmitting(true);
+      setError(null);
+      setUploadProgress(0);
       
-      if (user?.user_metadata?.company_id) {
-        companyId = user.user_metadata.company_id;
+      if (!user) {
+        throw new Error("Usuário não autenticado");
       }
       
-      // Handle file upload if necessary
+      // Validate form
+      if (!formData.title) {
+        throw new Error("O título é obrigatório");
+      }
+      
+      if (formData.videoType === "YOUTUBE" && !formData.videoUrl) {
+        throw new Error("A URL do vídeo é obrigatória");
+      }
+      
+      if (formData.videoType === "UPLOAD" && !file && !isEditMode) {
+        throw new Error("Você deve fazer upload de um vídeo");
+      }
+      
+      // Upload file if needed
       let videoUrl = formData.videoUrl;
-      
-      if (formData.videoType === "UPLOAD" && file) {
-        setIsUploading(true);
+      if (file && formData.videoType === "UPLOAD") {
         try {
+          // Simulate upload progress updates
+          const progressInterval = setInterval(() => {
+            setUploadProgress(prev => {
+              if (prev >= 90) {
+                clearInterval(progressInterval);
+                return 90;
+              }
+              return prev + 10;
+            });
+          }, 500);
+          
           videoUrl = await uploadTrainingVideo(file);
-        } catch (error: any) {
-          toast({
-            title: "Erro no upload do vídeo",
-            description: error.message || "Não foi possível fazer o upload do vídeo",
-            variant: "destructive"
-          });
-          setIsSubmitting(false);
-          setIsUploading(false);
-          return;
+          clearInterval(progressInterval);
+          setUploadProgress(100);
+        } catch (err: any) {
+          throw new Error(`Erro ao fazer upload do vídeo: ${err.message || "Erro desconhecido"}`);
         }
-        setIsUploading(false);
       }
       
+      // Prepare training data
       const trainingData = {
         title: formData.title,
         description: formData.description,
         video_type: formData.videoType,
         video_url: videoUrl,
-        duration_min: parseInt(formData.durationMin),
-        tags: filteredTags.length > 0 ? filteredTags : null,
-        company_id: companyId,
+        duration_min: parseInt(formData.durationMin, 10) || 10,
+        tags: tags,
+        company_id: user.company_id,
         visibility: formData.visibility
       };
       
+      // Create or update training
       if (isEditMode && id) {
-        // Update existing training
         await updateTraining(id, trainingData);
         toast({
           title: "Treinamento atualizado",
           description: "O treinamento foi atualizado com sucesso"
         });
       } else {
-        // Create new training
         await createTraining(trainingData);
         toast({
           title: "Treinamento criado",
@@ -245,258 +206,242 @@ const TrainingForm = () => {
       // Navigate back to trainings list
       navigate("/trainings");
       
-    } catch (error: any) {
-      console.error("Erro ao salvar treinamento:", error);
+    } catch (err: any) {
+      console.error("Error submitting training:", err);
+      setError(`Erro: ${err.message || "Erro desconhecido"}`);
       toast({
-        title: "Erro ao salvar",
-        description: error.message || "Ocorreu um erro ao salvar o treinamento",
+        title: "Erro",
+        description: err.message || "Ocorreu um erro ao salvar o treinamento",
         variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
-  
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <Loader className="h-8 w-8 animate-spin text-taggui-primary" />
-          <span className="ml-2">Carregando dados do treinamento...</span>
-        </div>
-      </Layout>
-    );
-  }
-  
-  if (loadError) {
-    return (
-      <Layout>
-        <div className="container mx-auto py-6">
-          <Alert variant="destructive">
-            <AlertTitle>Erro</AlertTitle>
-            <AlertDescription>{loadError}</AlertDescription>
-          </Alert>
-          <div className="flex justify-center mt-4">
-            <Button onClick={() => navigate("/trainings")}>
-              Voltar para Treinamentos
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-  
+
   return (
     <Layout>
-      <div className="container mx-auto py-6 space-y-6 max-w-4xl">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto py-6">
+        {/* Header with back button */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate(-1)} 
+            className="p-0 h-8 w-8"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/trainings")}
-              className="mb-2"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-            </Button>
             <h1 className="text-2xl font-bold">
               {isEditMode ? "Editar Treinamento" : "Novo Treinamento"}
             </h1>
+            <p className="text-muted-foreground">
+              {isEditMode 
+                ? "Atualize as informações do treinamento" 
+                : "Crie um novo treinamento para sua equipe"
+              }
+            </p>
           </div>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Título</Label>
-              <Input
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="Digite um título para o treinamento"
-                className={errors.title ? "border-red-500" : ""}
-              />
-              {errors.title && <p className="text-sm text-red-500 mt-1">{errors.title}</p>}
-            </div>
-            
-            <div>
-              <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Descreva o conteúdo do treinamento"
-                rows={4}
-              />
-            </div>
-            
-            <div>
-              <Label>Tipo de Vídeo</Label>
-              <RadioGroup 
-                value={formData.videoType} 
-                onValueChange={handleRadioChange}
-                className="flex gap-4 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="YOUTUBE" id="youtube" />
-                  <Label htmlFor="youtube">YouTube</Label>
+        {/* Content */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error && !submitting ? (
+          <Alert variant="destructive" className="mb-6">
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : (
+          <Card>
+            <CardContent className="p-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Title */}
+                <div className="space-y-2">
+                  <Label htmlFor="title">Título</Label>
+                  <Input 
+                    id="title"
+                    name="title"
+                    placeholder="Título do treinamento" 
+                    value={formData.title}
+                    onChange={handleChange}
+                    required
+                  />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="UPLOAD" id="upload" />
-                  <Label htmlFor="upload">Upload</Label>
+                
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea 
+                    id="description"
+                    name="description"
+                    placeholder="Descreva o treinamento"
+                    rows={4}
+                    value={formData.description}
+                    onChange={handleChange}
+                  />
                 </div>
-              </RadioGroup>
-            </div>
-            
-            <div>
-              <Label>Visibilidade</Label>
-              <RadioGroup 
-                value={formData.visibility} 
-                onValueChange={handleVisibilityChange}
-                className="flex gap-4 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="PUBLIC" id="public" />
-                  <Label htmlFor="public">Público</Label>
+                
+                {/* Video Type */}
+                <div className="space-y-2">
+                  <Label>Tipo de vídeo</Label>
+                  <RadioGroup 
+                    value={formData.videoType}
+                    onValueChange={handleRadioChange}
+                    className="flex flex-col space-y-1"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="YOUTUBE" id="video-youtube" />
+                      <Label htmlFor="video-youtube">YouTube</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="UPLOAD" id="video-upload" />
+                      <Label htmlFor="video-upload">Upload de arquivo</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="PRIVATE" id="private" />
-                  <Label htmlFor="private">Privado</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
-            {formData.videoType === "YOUTUBE" ? (
-              <div>
-                <Label htmlFor="videoUrl">URL do Vídeo do YouTube</Label>
-                <Input
-                  id="videoUrl"
-                  name="videoUrl"
-                  value={formData.videoUrl}
-                  onChange={handleChange}
-                  placeholder="Ex: https://www.youtube.com/watch?v=..."
-                  className={errors.videoUrl ? "border-red-500" : ""}
-                />
-                {errors.videoUrl && <p className="text-sm text-red-500 mt-1">{errors.videoUrl}</p>}
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="videoUpload">Fazer Upload do Vídeo</Label>
-                <div className="mt-2">
-                  <Card className="border-dashed">
-                    <CardContent className="p-4">
-                      <div className="flex flex-col items-center justify-center py-4">
-                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-500">
-                          {file ? file.name : "Selecione um arquivo de vídeo"}
-                        </p>
-                        <div className="mt-4">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => document.getElementById("videoUpload")?.click()}
-                          >
-                            Selecionar Arquivo
-                          </Button>
-                          <input
-                            type="file"
-                            id="videoUpload"
-                            accept="video/*"
-                            onChange={handleFileChange}
-                            className="hidden"
-                          />
+                
+                {/* YouTube URL or File Upload based on selected type */}
+                {formData.videoType === "YOUTUBE" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="videoUrl">URL do YouTube</Label>
+                    <Input 
+                      id="videoUrl"
+                      name="videoUrl"
+                      placeholder="https://youtube.com/watch?v=..." 
+                      value={formData.videoUrl}
+                      onChange={handleChange}
+                      required={formData.videoType === "YOUTUBE"}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Cole a URL completa do vídeo do YouTube
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="videoFile">Arquivo de vídeo</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input 
+                        id="videoFile"
+                        type="file"
+                        accept="video/*"
+                        onChange={handleFileChange}
+                        className={isEditMode ? "w-3/4" : "w-full"}
+                      />
+                      {isEditMode && (
+                        <div className="text-sm text-muted-foreground">
+                          {file ? file.name : "Manter vídeo atual"}
                         </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Formatos aceitos: MP4, WebM. Tamanho máximo: 100MB.
+                    </p>
+                    
+                    {uploadProgress > 0 && (
+                      <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
+                        <div 
+                          className="bg-primary h-2.5 rounded-full" 
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
                       </div>
-                    </CardContent>
-                  </Card>
-                  {errors.videoUrl && <p className="text-sm text-red-500 mt-1">{errors.videoUrl}</p>}
+                    )}
+                  </div>
+                )}
+                
+                {/* Duration */}
+                <div className="space-y-2">
+                  <Label htmlFor="durationMin">Duração (minutos)</Label>
+                  <Input 
+                    id="durationMin"
+                    name="durationMin"
+                    type="number"
+                    min="1"
+                    value={formData.durationMin}
+                    onChange={handleChange}
+                    className="max-w-[200px]"
+                  />
                 </div>
-              </div>
-            )}
-            
-            <div>
-              <Label htmlFor="durationMin">Duração (minutos)</Label>
-              <Input
-                id="durationMin"
-                name="durationMin"
-                value={formData.durationMin}
-                onChange={handleChange}
-                type="number"
-                min="1"
-                className={`w-48 ${errors.durationMin ? "border-red-500" : ""}`}
-              />
-              {errors.durationMin && <p className="text-sm text-red-500 mt-1">{errors.durationMin}</p>}
-            </div>
-            
-            <div>
-              <Label>Tags</Label>
-              <div className="flex gap-2 mt-2">
-                <Input
-                  id="tag"
-                  name="tag"
-                  value={formData.tag}
-                  onChange={handleChange}
-                  placeholder="Adicione uma tag"
-                  className="flex-grow"
-                />
-                <Button type="button" onClick={addTag} size="sm" className="flex-shrink-0">
-                  <Plus className="h-4 w-4 mr-1" /> Adicionar
-                </Button>
-              </div>
-              
-              {filteredTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {filteredTags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="bg-taggui-primary/10 text-taggui-primary px-2 py-1 rounded-full text-sm flex items-center"
+                
+                {/* Tags */}
+                <div className="space-y-2">
+                  <Label htmlFor="tag">Tags</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {tags.map((tag, index) => (
+                      <Badge key={index} variant="secondary" className="text-sm py-1 px-3">
+                        {tag}
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoveTag(tag)} 
+                          className="ml-2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Input 
+                      id="tag"
+                      name="tag"
+                      placeholder="Adicionar tag" 
+                      value={formData.tag}
+                      onChange={handleChange}
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleAddTag}
+                      disabled={!formData.tag.trim()}
                     >
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(tag)}
-                        className="ml-1 text-taggui-primary hover:text-taggui-primary-hover rounded-full"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/trainings")}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="taggui-btn-primary"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader className="h-4 w-4 animate-spin mr-2" />
-                  {isUploading ? "Enviando vídeo..." : "Salvando..."}
-                </>
-              ) : (
-                isEditMode ? "Atualizar Treinamento" : "Criar Treinamento"
-              )}
-            </Button>
-          </div>
-        </form>
+                
+                {/* Visibility */}
+                <div className="space-y-2">
+                  <Label>Visibilidade</Label>
+                  <RadioGroup 
+                    value={formData.visibility}
+                    onValueChange={handleVisibilityChange}
+                    className="flex flex-col space-y-1"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="PUBLIC" id="visibility-public" />
+                      <Label htmlFor="visibility-public">Público (todos colaboradores)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="PRIVATE" id="visibility-private" />
+                      <Label htmlFor="visibility-private">Privado (apenas colaboradores selecionados)</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                
+                {/* Submit buttons */}
+                <div className="flex items-center justify-end gap-2 pt-4">
+                  <Link to="/trainings">
+                    <Button type="button" variant="outline">
+                      Cancelar
+                    </Button>
+                  </Link>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                    {isEditMode ? "Salvar alterações" : "Criar treinamento"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </Layout>
   );
 };
 
 export default TrainingForm;
-

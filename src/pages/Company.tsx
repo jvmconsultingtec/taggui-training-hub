@@ -1,349 +1,236 @@
 
 import { useState, useEffect } from "react";
 import Layout from "@/components/layout/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { fetchCompanyUsers, fetchCurrentUser } from "@/services/api";
-import { AlertCircle, Building, Users, FileText, Info } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { fetchCurrentUser } from "@/services/api";
+import { toast } from "@/hooks/use-toast";
+import { AlertCircle, Loader } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 
-type CompanyData = {
+interface CompanyData {
   id: string;
   name: string;
   logo_url: string | null;
-  totalUsers: number;
-  admins: number;
-  managers: number;
-  collaborators: number;
-};
+}
 
 const Company = () => {
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [companyName, setCompanyName] = useState("");
 
   useEffect(() => {
-    const loadCompanyData = async () => {
+    const fetchCompany = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Obter o usuário atual para acessar dados da empresa
-        const currentUser = await fetchCurrentUser();
-        if (!currentUser) {
-          setError("Não foi possível carregar os dados do usuário atual.");
+        // First get the current user
+        const user = await fetchCurrentUser();
+        
+        if (!user || !user.company_id) {
+          setError("Não foi possível obter informações da empresa.");
+          setLoading(false);
           return;
         }
         
-        // Buscar todos os usuários da empresa
-        const users = await fetchCompanyUsers();
+        // Then fetch the company information
+        const { data, error } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", user.company_id)
+          .single();
+          
+        if (error) {
+          console.error("Erro ao buscar dados da empresa:", error);
+          setError("Erro ao buscar dados da empresa.");
+          setLoading(false);
+          return;
+        }
         
-        // Calcular estatísticas
-        const admins = users.filter(user => user.role === 'ADMIN').length;
-        const managers = users.filter(user => user.role === 'MANAGER').length;
-        const collaborators = users.filter(user => user.role === 'COLLABORATOR').length;
+        setCompanyData(data);
+        if (data?.name) {
+          setCompanyName(data.name);
+        }
         
-        // Como estamos usando o mesmo ID de empresa para todos os usuários,
-        // podemos usar o company_id do usuário atual
-        setCompanyData({
-          id: currentUser.company_id,
-          name: "TAGGUI Ltda.", // Normalmente viria da tabela de empresas
-          logo_url: null,
-          totalUsers: users.length,
-          admins,
-          managers,
-          collaborators
-        });
-      } catch (err: any) {
-        console.error("Erro ao carregar dados da empresa:", err);
-        setError("Não foi possível carregar os dados da empresa. Por favor, tente novamente mais tarde.");
-      } finally {
+        setLoading(false);
+      } catch (err) {
+        console.error("Erro ao carregar empresa:", err);
+        setError("Ocorreu um erro ao carregar os dados da empresa.");
         setLoading(false);
       }
     };
-
-    loadCompanyData();
+    
+    fetchCompany();
   }, []);
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="container mx-auto py-6">
-          <div className="text-center py-12">Carregando dados da empresa...</div>
-        </div>
-      </Layout>
-    );
-  }
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setLogoFile(file);
+      
+      // Preview the image
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-  if (error) {
-    return (
-      <Layout>
-        <div className="container mx-auto py-6">
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!companyData) return;
+    
+    try {
+      setSubmitting(true);
+      
+      let logoUrl = companyData.logo_url;
+      
+      // If there's a new logo, upload it first
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `company_logo_${companyData.id}_${Date.now()}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('training_videos') // We'll reuse the existing bucket for now
+          .upload(filePath, logoFile);
+          
+        if (uploadError) {
+          throw uploadError;
+        }
+        
+        const { data } = supabase.storage
+          .from('training_videos')
+          .getPublicUrl(filePath);
+          
+        logoUrl = data.publicUrl;
+      }
+      
+      // Update company data
+      const { error: updateError } = await supabase
+        .from("companies")
+        .update({
+          name: companyName,
+          logo_url: logoUrl
+        })
+        .eq("id", companyData.id);
+        
+      if (updateError) {
+        throw updateError;
+      }
+      
+      toast({
+        title: "Empresa atualizada",
+        description: "As informações da empresa foram atualizadas com sucesso"
+      });
+      
+      // Update local state
+      setCompanyData({
+        ...companyData,
+        name: companyName,
+        logo_url: logoUrl
+      });
+      
+    } catch (err: any) {
+      console.error("Erro ao atualizar empresa:", err);
+      toast({
+        title: "Erro ao atualizar empresa",
+        description: err.message || "Ocorreu um erro ao salvar as informações da empresa",
+        variant: "destructive"
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="container mx-auto py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Sua Empresa</h1>
+          <p className="text-muted-foreground">Gerencie as informações da sua empresa</p>
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center">
+            <Loader className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Erro</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        </div>
-      </Layout>
-    );
-  }
-
-  return (
-    <Layout>
-      <div className="container mx-auto py-6 space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold">Empresa</h1>
-          <p className="text-muted-foreground">Informações sobre sua empresa e licença</p>
-        </div>
-
-        <Tabs defaultValue="overview">
-          <TabsList>
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="license">Licença</TabsTrigger>
-            <TabsTrigger value="documents">Documentos</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle>Dados da Empresa</CardTitle>
-                  <CardDescription>Informações cadastrais da empresa</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4 mb-6">
-                    <Avatar className="h-16 w-16">
-                      {companyData?.logo_url ? (
-                        <AvatarImage src={companyData.logo_url} />
-                      ) : (
+        ) : (
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações da Empresa</CardTitle>
+                <CardDescription>Atualize o perfil da sua empresa</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="company-logo">Logo da Empresa</Label>
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-20 w-20">
+                        {(logoPreview || companyData?.logo_url) && (
+                          <AvatarImage 
+                            src={logoPreview || companyData?.logo_url || ''} 
+                            alt={companyData?.name} 
+                          />
+                        )}
                         <AvatarFallback className="text-2xl">
-                          <Building />
+                          {companyData?.name?.substring(0, 2).toUpperCase() || 'CO'}
                         </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div>
-                      <h3 className="text-xl font-medium">{companyData?.name}</h3>
-                      <Badge variant="outline">Plano Empresarial</Badge>
+                      </Avatar>
+                      
+                      <div>
+                        <Input
+                          id="company-logo"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoChange}
+                          className="max-w-sm"
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Formatos aceitos: JPG, PNG. Tamanho máximo: 2MB
+                        </p>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">CNPJ</h4>
-                      <p>00.000.000/0001-00</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Razão Social</h4>
-                      <p>{companyData?.name}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Email Corporativo</h4>
-                      <p>contato@taggui.com.br</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Telefone</h4>
-                      <p>(11) 9999-9999</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Endereço</h4>
-                      <p>Av. Paulista, 1000 - São Paulo, SP</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Site</h4>
-                      <p>www.taggui.com.br</p>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company-name">Nome da Empresa</Label>
+                    <Input
+                      id="company-name"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      required
+                    />
                   </div>
-                </CardContent>
-                <CardFooter className="flex justify-end">
-                  <Button variant="outline">Editar Dados</Button>
-                </CardFooter>
-              </Card>
-              
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Users size={18} />
-                      <CardTitle className="text-base">Colaboradores</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{companyData?.totalUsers}</div>
-                    <p className="text-sm text-muted-foreground">Total de colaboradores</p>
-                    
-                    <div className="grid grid-cols-3 gap-2 mt-4">
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="font-medium">{companyData?.admins}</div>
-                        <p className="text-xs text-muted-foreground">Admins</p>
-                      </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="font-medium">{companyData?.managers}</div>
-                        <p className="text-xs text-muted-foreground">Gerentes</p>
-                      </div>
-                      <div className="text-center p-2 bg-gray-50 rounded-md">
-                        <div className="font-medium">{companyData?.collaborators}</div>
-                        <p className="text-xs text-muted-foreground">Colaboradores</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Info size={18} />
-                      <CardTitle className="text-base">Status</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                      <span className="text-sm font-medium">Ativo</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Sua empresa está com a licença ativa e todos os serviços disponíveis.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="license">
-            <Card>
-              <CardHeader>
-                <CardTitle>Licença</CardTitle>
-                <CardDescription>Detalhes da licença e plano</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Plano</h4>
-                      <p className="font-medium">Empresarial</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Status</h4>
-                      <p className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                        Ativo
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Data de Início</h4>
-                      <p>01/01/2025</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Data de Renovação</h4>
-                      <p>01/01/2026</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Usuários Permitidos</h4>
-                      <p>Ilimitado</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Usuários Ativos</h4>
-                      <p>{companyData?.totalUsers || 0}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Recursos Incluídos</h4>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        Gerenciamento de treinamentos
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        Relatórios avançados
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        Integração com RH
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        Armazenamento ilimitado
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        Suporte prioritário
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+
+                  <Button type="submit" disabled={submitting}>
+                    {submitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar Alterações
+                  </Button>
+                </form>
               </CardContent>
-              <CardFooter className="justify-end space-x-2">
-                <Button variant="outline">Ver Fatura</Button>
-                <Button>Gerenciar Plano</Button>
-              </CardFooter>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="documents">
-            <Card>
-              <CardHeader>
-                <CardTitle>Documentos</CardTitle>
-                <CardDescription>Documentos da empresa e contratos</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center gap-3">
-                      <FileText size={24} className="text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Contrato de Licença</p>
-                        <p className="text-sm text-muted-foreground">PDF - 1.2MB</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">Download</Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center gap-3">
-                      <FileText size={24} className="text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Termos de Uso</p>
-                        <p className="text-sm text-muted-foreground">PDF - 0.8MB</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">Download</Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center gap-3">
-                      <FileText size={24} className="text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Política de Privacidade</p>
-                        <p className="text-sm text-muted-foreground">PDF - 0.5MB</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">Download</Button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center gap-3">
-                      <FileText size={24} className="text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">Certificado Digital</p>
-                        <p className="text-sm text-muted-foreground">PDF - 0.3MB</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">Download</Button>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button variant="outline">Enviar Documento</Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </Layout>
   );
