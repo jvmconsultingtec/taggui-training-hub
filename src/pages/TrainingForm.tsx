@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const TrainingForm = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form state
@@ -149,6 +149,10 @@ const TrainingForm = () => {
     setIsSubmitting(true);
     
     try {
+      // Get company_id from user metadata
+      const userMetadata = user?.user_metadata as { company_id?: string } || {};
+      const companyId = userMetadata.company_id || '00000000-0000-0000-0000-000000000000';
+      
       // Real API call to save the training
       await createTraining({
         title: formData.title,
@@ -157,7 +161,8 @@ const TrainingForm = () => {
         video_url: formData.videoUrl,
         duration_min: parseInt(formData.durationMin),
         tags: filteredTags.length > 0 ? filteredTags : null,
-        company_id: user?.company_id || ""
+        company_id: companyId,
+        visibility: "PUBLIC" // Adding the missing field
       });
       
       toast({
