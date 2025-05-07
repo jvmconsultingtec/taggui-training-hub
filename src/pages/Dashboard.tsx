@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchAssignedTrainings } from "@/services/api";
-import { Layout } from "@/components/layout/Layout";
+import Layout from "@/components/layout/Layout";
 import { TrainingStats } from "@/components/dashboard/TrainingStats";
-import { TrainingCard } from "@/components/trainings/TrainingCard";
+import TrainingCard from "@/components/trainings/TrainingCard";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";

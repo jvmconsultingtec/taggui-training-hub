@@ -1,9 +1,10 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchTrainingById, updateTrainingProgress } from "@/services/api";
-import { Layout } from "@/components/layout/Layout";
-import { VideoPlayer } from "@/components/trainings/VideoPlayer";
+import Layout from "@/components/layout/Layout";
+import VideoPlayer from "@/components/trainings/VideoPlayer";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Clock, Bookmark, Tag, Check } from "lucide-react";
