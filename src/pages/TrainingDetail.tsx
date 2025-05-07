@@ -22,12 +22,30 @@ const TrainingDetail = () => {
 
   useEffect(() => {
     const loadTraining = async () => {
-      if (!id || !user) return;
+      if (!id) {
+        setError("ID do treinamento não fornecido");
+        setLoading(false);
+        return;
+      }
+      
+      if (!user) {
+        setError("Usuário não autenticado");
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
         setError(null);
+        console.log("Loading training with ID:", id);
         const trainingData = await fetchTrainingById(id);
+        
+        if (!trainingData) {
+          setError("Treinamento não encontrado");
+          setLoading(false);
+          return;
+        }
+        
         setTraining(trainingData);
         
         // Try to load progress if it exists
@@ -39,9 +57,9 @@ const TrainingDetail = () => {
         } catch (error) {
           console.log("No progress data found, starting fresh");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading training:", error);
-        setError("Não foi possível carregar os detalhes do treinamento");
+        setError(error.message || "Não foi possível carregar os detalhes do treinamento");
         toast({
           title: "Erro ao carregar treinamento",
           description: "Não foi possível carregar os detalhes do treinamento",
@@ -161,11 +179,13 @@ const TrainingDetail = () => {
         </div>
         
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <VideoPlayer 
-            videoUrl={training.video_url} 
-            videoType={training.video_type}
-            onProgressUpdate={handleProgressUpdate}
-          />
+          {training.video_url && (
+            <VideoPlayer 
+              videoUrl={training.video_url} 
+              videoType={training.video_type}
+              onProgressUpdate={handleProgressUpdate}
+            />
+          )}
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

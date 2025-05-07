@@ -10,6 +10,7 @@ type TrainingAssignment = Database["public"]["Tables"]["training_assignments"]["
 // Trainings
 export const fetchTrainings = async () => {
   try {
+    console.log("Fetching trainings...");
     const { data, error } = await supabase
       .from("trainings")
       .select("*")
@@ -20,26 +21,29 @@ export const fetchTrainings = async () => {
       throw error;
     }
     
-    return data;
+    console.log("Trainings fetched:", data);
+    return data || [];
   } catch (error) {
     console.error("Erro capturado ao buscar treinamentos:", error);
-    throw error;
+    return [];
   }
 };
 
 export const fetchTrainingById = async (id: string) => {
   try {
+    console.log("Fetching training by ID:", id);
     const { data, error } = await supabase
       .from("trainings")
       .select("*")
       .eq("id", id)
-      .single();
+      .maybeSingle();
     
     if (error) {
       console.error("Erro ao buscar treinamento por ID:", error);
       throw error;
     }
     
+    console.log("Training fetched:", data);
     return data;
   } catch (error) {
     console.error("Erro capturado ao buscar treinamento por ID:", error);
@@ -49,6 +53,7 @@ export const fetchTrainingById = async (id: string) => {
 
 export const createTraining = async (training: Omit<Training, "id" | "created_at">) => {
   try {
+    console.log("Creating training:", training);
     const { data, error } = await supabase
       .from("trainings")
       .insert(training)
@@ -60,6 +65,7 @@ export const createTraining = async (training: Omit<Training, "id" | "created_at
       throw error;
     }
     
+    console.log("Training created:", data);
     return data;
   } catch (error) {
     console.error("Erro capturado ao criar treinamento:", error);
@@ -69,6 +75,7 @@ export const createTraining = async (training: Omit<Training, "id" | "created_at
 
 export const updateTraining = async (id: string, updates: Partial<Training>) => {
   try {
+    console.log("Updating training:", id, updates);
     const { data, error } = await supabase
       .from("trainings")
       .update(updates)
@@ -81,6 +88,7 @@ export const updateTraining = async (id: string, updates: Partial<Training>) => 
       throw error;
     }
     
+    console.log("Training updated:", data);
     return data;
   } catch (error) {
     console.error("Erro capturado ao atualizar treinamento:", error);
@@ -90,6 +98,7 @@ export const updateTraining = async (id: string, updates: Partial<Training>) => 
 
 export const deleteTraining = async (id: string) => {
   try {
+    console.log("Deleting training:", id);
     const { error } = await supabase
       .from("trainings")
       .delete()
@@ -99,6 +108,7 @@ export const deleteTraining = async (id: string) => {
       console.error("Erro ao deletar treinamento:", error);
       throw error;
     }
+    console.log("Training deleted successfully");
   } catch (error) {
     console.error("Erro capturado ao deletar treinamento:", error);
     throw error;
@@ -108,6 +118,7 @@ export const deleteTraining = async (id: string) => {
 // Training Assignments
 export const fetchAssignedTrainings = async (userId: string) => {
   try {
+    console.log("Fetching assigned trainings for user:", userId);
     const { data, error } = await supabase
       .from("training_assignments")
       .select(`
@@ -121,6 +132,7 @@ export const fetchAssignedTrainings = async (userId: string) => {
       throw error;
     }
     
+    console.log("Assigned trainings fetched:", data);
     return data || [];
   } catch (error) {
     console.error("Erro capturado ao buscar treinamentos atribuídos:", error);
@@ -130,6 +142,7 @@ export const fetchAssignedTrainings = async (userId: string) => {
 
 export const assignTraining = async (trainingId: string, userIds: string[]) => {
   try {
+    console.log("Assigning training:", trainingId, "to users:", userIds);
     const assignments = userIds.map(userId => ({
       training_id: trainingId,
       user_id: userId
@@ -145,6 +158,7 @@ export const assignTraining = async (trainingId: string, userIds: string[]) => {
       throw error;
     }
     
+    console.log("Training assigned:", data);
     return data;
   } catch (error) {
     console.error("Erro capturado ao atribuir treinamento:", error);
@@ -155,18 +169,20 @@ export const assignTraining = async (trainingId: string, userIds: string[]) => {
 // Training Progress
 export const fetchTrainingProgress = async (trainingId: string, userId: string) => {
   try {
+    console.log("Fetching training progress:", trainingId, userId);
     const { data, error } = await supabase
       .from("training_progress")
       .select("*")
       .eq("training_id", trainingId)
       .eq("user_id", userId)
-      .maybeSingle(); // Usando maybeSingle em vez de single para evitar erros
+      .maybeSingle();
     
     if (error) {
       console.error("Erro ao buscar progresso do treinamento:", error);
       throw error;
     }
     
+    console.log("Training progress fetched:", data);
     return data;
   } catch (error) {
     console.error("Erro capturado ao buscar progresso do treinamento:", error);
@@ -176,6 +192,7 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
 
 export const updateTrainingProgress = async (trainingId: string, userId: string, progressPct: number, completed: boolean = false) => {
   try {
+    console.log("Updating training progress:", trainingId, userId, progressPct, completed);
     // Primeiro tenta buscar se já existe um registro de progresso
     const existingProgress = await fetchTrainingProgress(trainingId, userId);
     
@@ -200,6 +217,7 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
           .select();
         
         if (error) throw error;
+        console.log("Training progress updated:", data);
         return data;
       } 
       // Se não existe, crie um novo
@@ -214,6 +232,7 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
           .select();
         
         if (error) throw error;
+        console.log("Training progress created:", data);
         return data;
       }
     } catch (error: any) {
@@ -229,6 +248,7 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
 // Users
 export const fetchCompanyUsers = async () => {
   try {
+    console.log("Fetching company users");
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -239,6 +259,7 @@ export const fetchCompanyUsers = async () => {
       throw error;
     }
     
+    console.log("Company users fetched:", data);
     return data || [];
   } catch (error) {
     console.error("Erro capturado ao buscar usuários:", error);
@@ -249,9 +270,15 @@ export const fetchCompanyUsers = async () => {
 // Função para obter o perfil do usuário atual
 export const fetchCurrentUser = async () => {
   try {
+    console.log("Fetching current user");
     const { data: { user } } = await supabase.auth.getUser();
     
-    if (!user) return null;
+    if (!user) {
+      console.log("No authenticated user found");
+      return null;
+    }
+    
+    console.log("User from auth:", user);
     
     const { data, error } = await supabase
       .from("users")
@@ -264,6 +291,7 @@ export const fetchCurrentUser = async () => {
       return null;
     }
     
+    console.log("Current user profile fetched:", data);
     return data;
   } catch (error) {
     console.error("Erro ao buscar usuário atual:", error);
@@ -274,6 +302,7 @@ export const fetchCurrentUser = async () => {
 // New function to fetch all training progress for a user
 export const fetchUserTrainingProgress = async (userId: string) => {
   try {
+    console.log("Fetching user training progress:", userId);
     const { data, error } = await supabase
       .from("training_progress")
       .select(`
@@ -288,6 +317,7 @@ export const fetchUserTrainingProgress = async (userId: string) => {
       throw error;
     }
     
+    console.log("User training progress fetched:", data);
     return data || [];
   } catch (error) {
     console.error("Erro capturado ao buscar progresso de treinamentos:", error);
@@ -298,6 +328,7 @@ export const fetchUserTrainingProgress = async (userId: string) => {
 // Storage
 export const uploadTrainingVideo = async (file: File) => {
   try {
+    console.log("Uploading training video:", file.name);
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     const filePath = `uploads/${fileName}`;
@@ -315,6 +346,7 @@ export const uploadTrainingVideo = async (file: File) => {
       .from('training_videos')
       .getPublicUrl(filePath);
     
+    console.log("Video uploaded, public URL:", data.publicUrl);
     return data.publicUrl;
   } catch (error) {
     console.error("Erro capturado ao fazer upload do vídeo:", error);

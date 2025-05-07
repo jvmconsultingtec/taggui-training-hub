@@ -9,4 +9,28 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    storage: localStorage
+  }
+});
+
+// Initialize storage bucket for training videos if it doesn't exist
+async function initStorage() {
+  try {
+    // We can't check for bucket existence directly through JavaScript SDK,
+    // so we'll attempt a minimal operation to see if it's available
+    const { data: buckets } = await supabase.storage.listBuckets();
+    
+    if (!buckets || !buckets.find(bucket => bucket.name === 'training_videos')) {
+      console.log("Training videos bucket not found, it needs to be created through SQL");
+    }
+  } catch (error) {
+    console.error("Error checking storage buckets:", error);
+  }
+}
+
+// Initialize storage when the client is imported
+initStorage();
