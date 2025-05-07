@@ -1,32 +1,21 @@
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchTrainingById, updateTrainingProgress } from "@/services/api";
 import Layout from "@/components/layout/Layout";
 import VideoPlayer from "@/components/trainings/VideoPlayer";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft, Calendar, Clock, Users } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Clock, Bookmark, Tag, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-
-type Training = {
-  id: string;
-  title: string;
-  description: string | null;
-  duration_min: number;
-  video_type: "UPLOAD" | "YOUTUBE";
-  video_url: string;
-  tags: string[] | null;
-};
+import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
 
 const TrainingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [training, setTraining] = useState<Training | null>(null);
   const [loading, setLoading] = useState(true);
-  const [completed, setCompleted] = useState(false);
+  const [training, setTraining] = useState<any>(null);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -35,10 +24,18 @@ const TrainingDetail = () => {
       
       try {
         setLoading(true);
-        const data = await fetchTrainingById(id);
-        setTraining(data);
+        const trainingData = await fetchTrainingById(id);
+        setTraining(trainingData);
         
-        // Here you would load progress data from training_progress table
+        // Try to load progress if it exists
+        try {
+          const progressData = await fetchTrainingProgress(id, user.id);
+          if (progressData) {
+            setProgress(progressData.progress_pct || 0);
+          }
+        } catch (error) {
+          console.log("No progress data found, starting fresh");
+        }
       } catch (error) {
         console.error("Error loading training:", error);
         toast({
@@ -51,40 +48,26 @@ const TrainingDetail = () => {
         setLoading(false);
       }
     };
-
+    
     loadTraining();
   }, [id, user, navigate]);
 
   const handleProgressUpdate = async (progressPercent: number) => {
-    if (!training || !user) return;
+    if (!id || !user) return;
     
     try {
+      const isCompleted = progressPercent >= 95; // Consider completed when 95% watched
+      await updateTrainingProgress(id, user.id, progressPercent, isCompleted);
       setProgress(progressPercent);
-      await updateTrainingProgress(training.id, user.id, progressPercent);
+      
+      if (isCompleted) {
+        toast({
+          title: "Treinamento concluído!",
+          description: "Parabéns por finalizar este treinamento"
+        });
+      }
     } catch (error) {
       console.error("Error updating progress:", error);
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!training || !user) return;
-    
-    try {
-      await updateTrainingProgress(training.id, user.id, 100, true);
-      setCompleted(true);
-      setProgress(100);
-      
-      toast({
-        title: "Treinamento completado",
-        description: "Parabéns por completar este treinamento!",
-      });
-    } catch (error) {
-      console.error("Error completing training:", error);
-      toast({
-        title: "Erro ao completar treinamento",
-        description: "Não foi possível marcar o treinamento como concluído",
-        variant: "destructive"
-      });
     }
   };
 
@@ -92,7 +75,9 @@ const TrainingDetail = () => {
     return (
       <Layout>
         <div className="container mx-auto py-6">
-          <div className="text-center">Carregando treinamento...</div>
+          <div className="text-center py-12">
+            <p>Carregando treinamento...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -102,7 +87,19 @@ const TrainingDetail = () => {
     return (
       <Layout>
         <div className="container mx-auto py-6">
-          <div className="text-center">Treinamento não encontrado</div>
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium">Treinamento não encontrado</h3>
+            <p className="text-muted-foreground mt-1">
+              O treinamento solicitado não existe ou foi removido.
+            </p>
+            <Button 
+              variant="link" 
+              onClick={() => navigate("/dashboard")} 
+              className="mt-4"
+            >
+              Voltar ao Dashboard
+            </Button>
+          </div>
         </div>
       </Layout>
     );
@@ -111,65 +108,96 @@ const TrainingDetail = () => {
   return (
     <Layout>
       <div className="container mx-auto py-6 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">{training.title}</h1>
-            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                <span>{training.duration_min} minutos</span>
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/dashboard")}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+          </Button>
+          
+          <h1 className="text-2xl font-bold">{training.title}</h1>
+        </div>
+        
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center">
+            <Clock className="h-4 w-4 mr-1" />
+            <span>{training.duration_min} minutos</span>
+          </div>
+          {training.created_at && (
+            <div className="flex items-center">
+              <Calendar className="h-4 w-4 mr-1" />
+              <span>Adicionado em {new Date(training.created_at).toLocaleDateString()}</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <VideoPlayer 
+            videoUrl={training.video_url} 
+            videoType={training.video_type}
+            onProgressUpdate={handleProgressUpdate}
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold">Descrição</h2>
+              <Separator className="my-2" />
+              <p className="text-gray-600">
+                {training.description || "Nenhuma descrição disponível para este treinamento."}
+              </p>
+            </div>
+            
+            {training.tags && training.tags.length > 0 && (
+              <div>
+                <h3 className="text-lg font-medium">Tags</h3>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {training.tags.map((tag: string) => (
+                    <span 
+                      key={tag} 
+                      className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
-              {completed ? (
-                <div className="flex items-center gap-1 text-green-600">
-                  <Check className="h-4 w-4" />
-                  <span>Concluído</span>
+            )}
+          </div>
+          
+          <div>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-medium mb-4">Seu progresso</h3>
+              
+              <div className="progress-bar mb-2">
+                <div 
+                  className="progress-bar-fill bg-taggui-primary" 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Progresso</span>
+                <span className="font-medium">{Math.round(progress)}%</span>
+              </div>
+              
+              {progress >= 100 ? (
+                <div className="mt-4 text-center">
+                  <div className="inline-block p-2 bg-green-100 text-green-800 rounded-full mb-2">
+                    ✓
+                  </div>
+                  <p className="font-medium">Treinamento concluído</p>
                 </div>
               ) : (
-                <div className="flex items-center gap-1">
-                  <Bookmark className="h-4 w-4" />
-                  <span>{progress}% completo</span>
-                </div>
+                <p className="text-sm text-gray-500 mt-4">
+                  Continue assistindo para completar este treinamento.
+                </p>
               )}
             </div>
           </div>
-          <Button 
-            onClick={handleComplete} 
-            disabled={completed || progress < 90}
-            className="bg-taggui-primary hover:bg-taggui-primary-hover"
-          >
-            {completed ? "Concluído" : "Marcar como Concluído"}
-          </Button>
-        </div>
-
-        <VideoPlayer 
-          videoType={training.video_type} 
-          videoUrl={training.video_url}
-          onProgressUpdate={handleProgressUpdate}
-        />
-
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Sobre este treinamento</h2>
-          <Separator />
-          <div className="prose max-w-none">
-            {training.description ? (
-              <p>{training.description}</p>
-            ) : (
-              <p className="text-muted-foreground">Nenhuma descrição disponível.</p>
-            )}
-          </div>
-
-          {training.tags && training.tags.length > 0 && (
-            <div className="pt-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Tag className="h-4 w-4 text-muted-foreground" />
-                {training.tags.map((tag, index) => (
-                  <div key={index} className="bg-taggui-primary-light text-taggui-primary px-2 py-1 rounded text-xs">
-                    {tag}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </Layout>

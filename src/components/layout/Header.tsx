@@ -1,9 +1,40 @@
 
 import { Bell, Search } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Desconectado com sucesso",
+        description: "Você foi desconectado do sistema"
+      });
+      navigate("/login");
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
+  };
+
+  // Obter as iniciais do nome do usuário
+  const getUserInitials = () => {
+    if (!user || !user.user_metadata?.name) return "U";
+    
+    const nameParts = user.user_metadata.name.trim().split(" ");
+    if (nameParts.length === 1) return nameParts[0].charAt(0).toUpperCase();
+    
+    return (
+      nameParts[0].charAt(0).toUpperCase() + 
+      nameParts[nameParts.length - 1].charAt(0).toUpperCase()
+    );
+  };
 
   return (
     <div className="relative">
@@ -12,16 +43,27 @@ const UserMenu = () => {
         className="flex items-center gap-2"
       >
         <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
-          <span className="font-medium">JD</span>
+          <span className="font-medium">{getUserInitials()}</span>
         </div>
       </button>
       
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
-          <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Perfil</a>
-          <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Configurações</a>
-          <div className="border-t border-gray-100 my-1"></div>
-          <a href="#" className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sair</a>
+          <button 
+            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => {
+              setIsOpen(false);
+              navigate("/profile");
+            }}
+          >
+            Perfil
+          </button>
+          <button 
+            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            onClick={handleLogout}
+          >
+            Sair
+          </button>
         </div>
       )}
     </div>

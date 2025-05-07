@@ -3,9 +3,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import Index from "./pages/Index";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import TrainingDetail from "./pages/TrainingDetail";
@@ -23,18 +26,23 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Public routes */}
+            <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             
-            {/* Employee routes */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/trainings/:id" element={<TrainingDetail />} />
-            
-            {/* Admin routes */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/trainings" element={<TrainingsList />} />
-            <Route path="/trainings/new" element={<TrainingForm />} />
-            <Route path="/trainings/edit/:id" element={<TrainingForm />} />
+            {/* Protected routes */}
+            <Route element={<ProtectedRoute />}>
+              {/* Employee routes */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/trainings/:id" element={<TrainingDetail />} />
+              
+              {/* Admin routes */}
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/trainings" element={<TrainingsList />} />
+              <Route path="/trainings/new" element={<TrainingForm />} />
+              <Route path="/trainings/edit/:id" element={<TrainingForm />} />
+            </Route>
             
             {/* Catch-all for 404 */}
             <Route path="*" element={<NotFound />} />
