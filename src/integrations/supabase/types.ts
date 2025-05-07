@@ -198,6 +198,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_user_access: {
+        Args: { user_id: string; company_id: string }
+        Returns: boolean
+      }
       criar_usuario: {
         Args: {
           user_id: string
