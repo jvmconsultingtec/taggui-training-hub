@@ -13,6 +13,11 @@ import { createTraining, fetchTrainingById, updateTraining, uploadTrainingVideo 
 import { ArrowLeft, Upload, Loader, Plus, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { Database } from "@/integrations/supabase/types";
+
+// Define the VideoType type from the Database types
+type VideoType = Database["public"]["Enums"]["video_type"];
+type Visibility = Database["public"]["Enums"]["visibility"];
 
 const TrainingForm = () => {
   const navigate = useNavigate();
@@ -23,11 +28,11 @@ const TrainingForm = () => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    videoType: "YOUTUBE",
+    videoType: "YOUTUBE" as VideoType,
     videoUrl: "",
     durationMin: "10",
     tag: "",
-    visibility: "PUBLIC" as "PUBLIC" | "PRIVATE"
+    visibility: "PUBLIC" as Visibility
   });
   
   // Tags state
@@ -63,11 +68,11 @@ const TrainingForm = () => {
             setFormData({
               title: training.title || "",
               description: training.description || "",
-              videoType: training.video_type || "YOUTUBE",
+              videoType: training.video_type as VideoType || "YOUTUBE",
               videoUrl: training.video_url || "",
               durationMin: String(training.duration_min) || "10",
               tag: "",
-              visibility: training.visibility || "PUBLIC"
+              visibility: training.visibility as Visibility || "PUBLIC"
             });
             
             if (training.tags && Array.isArray(training.tags)) {
@@ -101,7 +106,7 @@ const TrainingForm = () => {
   
   // Handle radio button changes
   const handleRadioChange = (value: string) => {
-    setFormData(prev => ({ ...prev, videoType: value as "YOUTUBE" | "UPLOAD" }));
+    setFormData(prev => ({ ...prev, videoType: value as VideoType }));
     if (value === "YOUTUBE") {
       setFile(null);
     }
@@ -109,7 +114,7 @@ const TrainingForm = () => {
   
   // Handle visibility change
   const handleVisibilityChange = (value: string) => {
-    setFormData(prev => ({ ...prev, visibility: value as "PUBLIC" | "PRIVATE" }));
+    setFormData(prev => ({ ...prev, visibility: value as Visibility }));
   };
   
   // Handle file changes
@@ -494,3 +499,4 @@ const TrainingForm = () => {
 };
 
 export default TrainingForm;
+

@@ -20,15 +20,29 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Initialize storage bucket for training videos if it doesn't exist
 async function initStorage() {
   try {
-    // We can't check for bucket existence directly through JavaScript SDK,
-    // so we'll attempt a minimal operation to see if it's available
+    // Check for bucket existence through JavaScript SDK
     const { data: buckets } = await supabase.storage.listBuckets();
     
+    // Look for the training_videos bucket
     if (!buckets || !buckets.find(bucket => bucket.name === 'training_videos')) {
-      console.log("Training videos bucket not found, it needs to be created through SQL");
+      console.log("Training videos bucket not found. Creating it now...");
+      
+      // Create the bucket
+      const { data, error } = await supabase.storage.createBucket('training_videos', {
+        public: true, // Make files publicly accessible
+        fileSizeLimit: 1024 * 1024 * 100, // 100MB file size limit
+      });
+      
+      if (error) {
+        console.error("Error creating training_videos bucket:", error);
+      } else {
+        console.log("Created training_videos bucket successfully:", data);
+      }
+    } else {
+      console.log("Training videos bucket already exists");
     }
   } catch (error) {
-    console.error("Error checking storage buckets:", error);
+    console.error("Error checking/creating storage buckets:", error);
   }
 }
 

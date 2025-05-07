@@ -6,6 +6,8 @@ type Training = Database["public"]["Tables"]["trainings"]["Row"];
 type User = Database["public"]["Tables"]["users"]["Row"];
 type TrainingProgress = Database["public"]["Tables"]["training_progress"]["Row"];
 type TrainingAssignment = Database["public"]["Tables"]["training_assignments"]["Row"];
+type VideoType = Database["public"]["Enums"]["video_type"];
+type Visibility = Database["public"]["Enums"]["visibility"];
 
 // Trainings
 export const fetchTrainings = async () => {
