@@ -202,6 +202,10 @@ export type Database = {
         Args: { user_id: string; company_id: string }
         Returns: boolean
       }
+      check_user_access_for_users: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       criar_usuario: {
         Args: {
           user_id: string

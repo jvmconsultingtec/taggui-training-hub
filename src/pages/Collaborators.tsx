@@ -7,8 +7,16 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { fetchCompanyUsers } from "@/services/api";
-import { AlertCircle, Search } from "lucide-react";
+import { AlertCircle, Search, SortAsc, SortDesc, Filter } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 type User = {
   id: string;
@@ -17,12 +25,18 @@ type User = {
   role: "ADMIN" | "MANAGER" | "COLLABORATOR";
 };
 
+type SortField = "name" | "email" | "role";
+type SortOrder = "asc" | "desc";
+
 const Collaborators = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [filterRole, setFilterRole] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -35,6 +49,11 @@ const Collaborators = () => {
       } catch (err: any) {
         console.error("Erro ao carregar colaboradores:", err);
         setError("Não foi possível carregar a lista de colaboradores. Por favor, tente novamente mais tarde.");
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar a lista de colaboradores",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
@@ -44,20 +63,40 @@ const Collaborators = () => {
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredUsers(users);
-      return;
-    }
-
-    const lowercaseQuery = searchQuery.toLowerCase();
-    const filtered = users.filter(
-      user =>
-        user.name.toLowerCase().includes(lowercaseQuery) ||
-        user.email.toLowerCase().includes(lowercaseQuery)
-    );
+    let result = [...users];
     
-    setFilteredUsers(filtered);
-  }, [searchQuery, users]);
+    // Apply role filter if set
+    if (filterRole) {
+      result = result.filter(user => user.role === filterRole);
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim() !== "") {
+      const lowercaseQuery = searchQuery.toLowerCase();
+      result = result.filter(
+        user =>
+          user.name.toLowerCase().includes(lowercaseQuery) ||
+          user.email.toLowerCase().includes(lowercaseQuery)
+      );
+    }
+    
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortField === "name") {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortField === "email") {
+        comparison = a.email.localeCompare(b.email);
+      } else if (sortField === "role") {
+        comparison = a.role.localeCompare(b.role);
+      }
+      
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+    
+    setFilteredUsers(result);
+  }, [searchQuery, users, sortField, sortOrder, filterRole]);
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -82,6 +121,26 @@ const Collaborators = () => {
     );
   };
 
+  const toggleSortOrder = () => {
+    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+  };
+
+  const handleSortChange = (field: SortField) => {
+    if (field === sortField) {
+      toggleSortOrder();
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSortField("name");
+    setSortOrder("asc");
+    setFilterRole(null);
+  };
+
   return (
     <Layout>
       <div className="container mx-auto py-6 space-y-8">
@@ -102,14 +161,69 @@ const Collaborators = () => {
           <CardHeader>
             <CardTitle>Equipe</CardTitle>
             <CardDescription>Lista de todos os colaboradores da sua empresa</CardDescription>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <Input
-                placeholder="Buscar colaborador por nome ou email..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            
+            <div className="flex flex-col md:flex-row gap-4 mt-4">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Input
+                  placeholder="Buscar colaborador por nome ou email..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <SortAsc size={16} />
+                      Ordenar por {sortField}
+                      {sortOrder === "asc" ? <SortAsc size={14} /> : <SortDesc size={14} />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleSortChange("name")}>
+                      Nome {sortField === "name" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSortChange("email")}>
+                      Email {sortField === "email" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSortChange("role")}>
+                      Cargo {sortField === "role" && (sortOrder === "asc" ? "↑" : "↓")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Filter size={16} />
+                      {filterRole ? `Filtro: ${filterRole}` : "Filtrar por cargo"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setFilterRole("ADMIN")}>
+                      Administradores
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterRole("MANAGER")}>
+                      Gerentes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterRole("COLLABORATOR")}>
+                      Colaboradores
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterRole(null)}>
+                      Todos
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {(searchQuery || filterRole || sortField !== "name" || sortOrder !== "asc") && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    Limpar filtros
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -117,30 +231,48 @@ const Collaborators = () => {
               <div className="text-center py-8">Carregando colaboradores...</div>
             ) : filteredUsers.length > 0 ? (
               <div className="space-y-4">
+                <div className="hidden md:flex text-xs text-muted-foreground mb-2 px-4">
+                  <div className="w-12"></div>
+                  <div className="flex-1 grid grid-cols-2">
+                    <div>NOME / EMAIL</div>
+                    <div className="text-right">CARGO</div>
+                  </div>
+                </div>
                 {filteredUsers.map((user) => (
                   <div key={user.id}>
                     <div className="flex items-center gap-4">
                       <Avatar>
                         <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                      <div className="flex-1 md:grid md:grid-cols-2">
+                        <div>
+                          <div className="font-medium">{user.name}</div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                        <div className="mt-2 md:mt-0 md:text-right">{getRoleBadge(user.role)}</div>
                       </div>
-                      <div>{getRoleBadge(user.role)}</div>
                     </div>
                     <Separator className="my-4" />
                   </div>
                 ))}
+
+                <div className="text-sm text-center text-muted-foreground">
+                  Mostrando {filteredUsers.length} de {users.length} colaboradores
+                </div>
               </div>
             ) : (
               <div className="text-center py-12">
                 <h3 className="text-lg font-medium">Nenhum colaborador encontrado</h3>
                 <p className="text-muted-foreground mt-1">
-                  {searchQuery.trim() !== ""
+                  {searchQuery.trim() !== "" || filterRole
                     ? "Nenhum colaborador corresponde à sua busca"
                     : "Não há colaboradores registrados no sistema"}
                 </p>
+                {(searchQuery.trim() !== "" || filterRole) && (
+                  <Button variant="outline" className="mt-4" onClick={clearFilters}>
+                    Limpar filtros
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>
