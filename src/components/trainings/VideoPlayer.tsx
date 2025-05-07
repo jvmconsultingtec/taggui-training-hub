@@ -1,11 +1,10 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from "lucide-react";
 
 interface VideoPlayerProps {
   videoUrl: string;
   videoType: "YOUTUBE" | "UPLOAD";
-  onProgress: (progress: number) => void;
+  onProgressUpdate?: (progress: number) => void;
   initialProgress?: number;
 }
 
@@ -23,7 +22,7 @@ const getYoutubeVideoId = (url: string) => {
   return match && match[2].length === 11 ? match[2] : null;
 };
 
-const VideoPlayer = ({ videoUrl, videoType, onProgress, initialProgress = 0 }: VideoPlayerProps) => {
+const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 0 }: VideoPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -100,7 +99,9 @@ const VideoPlayer = ({ videoUrl, videoType, onProgress, initialProgress = 0 }: V
     // Calculate and update progress
     const newProgress = (value / duration) * 100;
     setProgress(newProgress);
-    onProgress(newProgress);
+    if (onProgressUpdate) {
+      onProgressUpdate(newProgress);
+    }
   };
   
   // Update time and progress as video plays
@@ -112,8 +113,8 @@ const VideoPlayer = ({ videoUrl, videoType, onProgress, initialProgress = 0 }: V
       setProgress(newProgress);
       
       // Only send progress updates every ~5%
-      if (Math.abs(newProgress - progress) > 5) {
-        onProgress(newProgress);
+      if (Math.abs(newProgress - progress) > 5 && onProgressUpdate) {
+        onProgressUpdate(newProgress);
         setProgress(newProgress);
       }
     }
@@ -165,7 +166,9 @@ const VideoPlayer = ({ videoUrl, videoType, onProgress, initialProgress = 0 }: V
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
           setIsPlaying(false);
-          onProgress(100);
+          if (onProgressUpdate) {
+            onProgressUpdate(100);
+          }
         }}
       />
       

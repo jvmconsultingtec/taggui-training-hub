@@ -5,13 +5,21 @@ import { Link } from "react-router-dom";
 export type TrainingStatus = "pending" | "inprogress" | "completed" | "overdue";
 
 export interface TrainingCardProps {
-  id: string;
-  title: string;
-  description?: string;
-  duration: number;
-  progress: number;
-  status: TrainingStatus;
+  id?: string;
+  title?: string;
+  description?: string | null;
+  duration?: number;
+  progress?: number;
+  status?: TrainingStatus;
   thumbnailUrl?: string;
+  training?: {
+    id: string;
+    title: string;
+    description: string | null;
+    duration_min: number;
+    video_type: "UPLOAD" | "YOUTUBE";
+    video_url: string;
+  };
 }
 
 const statusIcons = {
@@ -28,15 +36,18 @@ const statusLabels = {
   overdue: "Atrasado"
 };
 
-const TrainingCard = ({
-  id,
-  title,
-  description,
-  duration,
-  progress,
-  status,
-  thumbnailUrl
-}: TrainingCardProps) => {
+const TrainingCard = (props: TrainingCardProps) => {
+  // If we're receiving the "training" object, extract properties from it
+  const {
+    id = props.training?.id,
+    title = props.training?.title,
+    description = props.training?.description,
+    duration = props.training?.duration_min,
+    progress = 0,
+    status = "pending",
+    thumbnailUrl
+  } = props;
+
   return (
     <Link to={`/trainings/${id}`} className="block group">
       <div className="taggui-card group-hover:shadow-md transition-shadow">
