@@ -11,6 +11,8 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   loading: boolean;
 };
 
@@ -155,6 +157,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Password reset function (sends reset email)
+  const resetPassword = async (email: string) => {
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Email enviado",
+        description: "Verifique sua caixa de entrada para redefinir sua senha"
+      });
+      
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar email",
+        description: error.message || "Não foi possível enviar o email de redefinição",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update password function (after reset)
+  const updatePassword = async (newPassword: string) => {
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Senha atualizada",
+        description: "Sua senha foi alterada com sucesso"
+      });
+      
+      navigate('/login');
+      
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar senha",
+        description: error.message || "Não foi possível atualizar sua senha",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Create auth context value
   const value = {
     user,
@@ -162,6 +226,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
     loading,
   };
 
