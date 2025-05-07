@@ -271,6 +271,30 @@ export const fetchCurrentUser = async () => {
   }
 };
 
+// New function to fetch all training progress for a user
+export const fetchUserTrainingProgress = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("training_progress")
+      .select(`
+        *,
+        training:trainings (*)
+      `)
+      .eq("user_id", userId)
+      .order("last_viewed_at", { ascending: false });
+    
+    if (error) {
+      console.error("Erro ao buscar progresso de treinamentos do usuário:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Erro capturado ao buscar progresso de treinamentos:", error);
+    return [];
+  }
+};
+
 // Storage
 export const uploadTrainingVideo = async (file: File) => {
   try {
