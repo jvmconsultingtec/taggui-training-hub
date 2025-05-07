@@ -9,6 +9,7 @@ import { ArrowLeft, Calendar, Clock, Users } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const TrainingDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,7 @@ const TrainingDetail = () => {
   const [loading, setLoading] = useState(true);
   const [training, setTraining] = useState<any>(null);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadTraining = async () => {
@@ -24,6 +26,7 @@ const TrainingDetail = () => {
       
       try {
         setLoading(true);
+        setError(null);
         const trainingData = await fetchTrainingById(id);
         setTraining(trainingData);
         
@@ -38,12 +41,12 @@ const TrainingDetail = () => {
         }
       } catch (error) {
         console.error("Error loading training:", error);
+        setError("Não foi possível carregar os detalhes do treinamento");
         toast({
           title: "Erro ao carregar treinamento",
           description: "Não foi possível carregar os detalhes do treinamento",
           variant: "destructive"
         });
-        navigate("/dashboard");
       } finally {
         setLoading(false);
       }
@@ -77,6 +80,28 @@ const TrainingDetail = () => {
         <div className="container mx-auto py-6">
           <div className="text-center py-12">
             <p>Carregando treinamento...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto py-6">
+          <Alert variant="destructive">
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <div className="text-center py-12">
+            <Button 
+              variant="link" 
+              onClick={() => navigate("/dashboard")} 
+              className="mt-4"
+            >
+              Voltar ao Dashboard
+            </Button>
           </div>
         </div>
       </Layout>

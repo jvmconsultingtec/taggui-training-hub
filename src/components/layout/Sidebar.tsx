@@ -83,10 +83,10 @@ const Sidebar = () => {
           isCollapsed={collapsed}
         />
         <NavItem 
-          to="/users" 
+          to="/collaborators" 
           icon={<UserCircle />} 
           label="Colaboradores" 
-          isActive={isActive("/users")} 
+          isActive={isActive("/collaborators")} 
           isCollapsed={collapsed}
         />
         <NavItem 

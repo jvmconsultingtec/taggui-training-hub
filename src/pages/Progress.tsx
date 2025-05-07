@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ type TrainingWithProgress = {
 };
 
 const Progress = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [trainings, setTrainings] = useState<TrainingWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,10 @@ const Progress = () => {
     if (training.completed) return "bg-green-500";
     if (training.progress_pct > 0) return "bg-blue-500";
     return "bg-gray-300";
+  };
+
+  const handleViewDashboard = () => {
+    navigate("/dashboard");
   };
 
   return (
@@ -139,8 +145,8 @@ const Progress = () => {
                   <p className="text-muted-foreground mt-1">
                     Você ainda não tem treinamentos atribuídos.
                   </p>
-                  <Button className="mt-4" asChild>
-                    <a href="/dashboard">Ver treinamentos disponíveis</a>
+                  <Button className="mt-4" onClick={handleViewDashboard}>
+                    Ver treinamentos disponíveis
                   </Button>
                 </div>
               )}
