@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const TrainingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [training, setTraining] = useState<any>(null);
   const [progress, setProgress] = useState(0);
@@ -28,7 +27,8 @@ const TrainingDetail = () => {
         return;
       }
       
-      if (!user) {
+      if (!user || !session) {
+        console.error("User or session is null. User:", user, "Session:", session ? "exists" : "null");
         setError("Usuário não autenticado");
         setLoading(false);
         return;
@@ -37,24 +37,36 @@ const TrainingDetail = () => {
       try {
         setLoading(true);
         setError(null);
-        console.log("Loading training with ID:", id);
+        console.log("Loading training with ID:", id, "User ID:", user.id);
+        
+        // Verificar se a sessão é válida
+        console.log("Current session expires at:", new Date(session?.expires_at || 0).toLocaleString());
+        console.log("Current time:", new Date().toLocaleString());
+        
         const trainingData = await fetchTrainingById(id);
         
         if (!trainingData) {
+          console.error("Training not found for ID:", id);
           setError("Treinamento não encontrado");
           setLoading(false);
           return;
         }
         
+        console.log("Training data loaded:", trainingData.title);
         setTraining(trainingData);
         
         // Try to load progress if it exists
         try {
+          console.log("Fetching training progress for training:", id, "and user:", user.id);
           const progressData = await fetchTrainingProgress(id, user.id);
           if (progressData) {
+            console.log("Progress data loaded:", progressData.progress_pct);
             setProgress(progressData.progress_pct || 0);
+          } else {
+            console.log("No progress data found");
           }
         } catch (error) {
+          console.error("Error loading progress:", error);
           console.log("No progress data found, starting fresh");
         }
       } catch (error: any) {
@@ -71,7 +83,7 @@ const TrainingDetail = () => {
     };
     
     loadTraining();
-  }, [id, user, navigate]);
+  }, [id, user, session, navigate]);
 
   const handleProgressUpdate = async (progressPercent: number) => {
     if (!id || !user) return;

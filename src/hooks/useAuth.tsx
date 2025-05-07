@@ -30,12 +30,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         setLoading(true);
         
+        console.log("Initializing auth state");
+        
         // Get current session
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (currentSession) {
           setUser(currentSession.user);
           setSession(currentSession);
+          console.log("Active session found for user:", currentSession.user.id);
+        } else {
+          console.log("No active session found");
         }
         
         // Listen for auth changes
