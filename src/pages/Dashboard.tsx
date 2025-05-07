@@ -1,13 +1,15 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchAssignedTrainings } from "@/services/api";
+import { fetchAssignedTrainings, fetchCurrentUser } from "@/services/api";
 import Layout from "@/components/layout/Layout";
 import { TrainingStats } from "@/components/dashboard/TrainingStats";
 import TrainingCard from "@/components/trainings/TrainingCard";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Assignment = {
   id: string;
@@ -25,6 +27,23 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [trainings, setTrainings] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user) return;
+      
+      try {
+        const profile = await fetchCurrentUser();
+        setUserProfile(profile);
+      } catch (err) {
+        console.error("Erro ao carregar perfil do usuário:", err);
+      }
+    };
+
+    loadUserProfile();
+  }, [user]);
 
   useEffect(() => {
     const loadTrainings = async () => {
@@ -32,15 +51,12 @@ const Dashboard = () => {
       
       try {
         setLoading(true);
+        setError(null);
         const data = await fetchAssignedTrainings(user.id);
         setTrainings(data);
-      } catch (error) {
-        console.error("Error loading trainings:", error);
-        toast({
-          title: "Erro ao carregar treinamentos",
-          description: "Não foi possível carregar seus treinamentos",
-          variant: "destructive"
-        });
+      } catch (err: any) {
+        console.error("Erro ao carregar treinamentos:", err);
+        setError("Não foi possível carregar os treinamentos. Por favor, tente novamente mais tarde.");
       } finally {
         setLoading(false);
       }
@@ -58,9 +74,19 @@ const Dashboard = () => {
     <Layout>
       <div className="container mx-auto py-6 space-y-8">
         <div>
-          <h1 className="text-2xl font-bold">Bem-vindo, {user?.user_metadata?.name || 'Colaborador'}</h1>
+          <h1 className="text-2xl font-bold">
+            Bem-vindo, {userProfile?.name || user?.user_metadata?.name || 'Colaborador'}
+          </h1>
           <p className="text-muted-foreground">Acompanhe seus treinamentos e continue aprendendo</p>
         </div>
+        
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2">

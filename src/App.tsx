@@ -14,9 +14,21 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TrainingDetail from "./pages/TrainingDetail";
 import TrainingsList from "./pages/TrainingsList";
 import TrainingForm from "./pages/TrainingForm";
+import Progress from "./pages/Progress";
+import Collaborators from "./pages/Collaborators";
+import Reports from "./pages/Reports";
+import Company from "./pages/Company";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -36,6 +48,11 @@ const App = () => (
               {/* Employee routes */}
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/trainings/:id" element={<TrainingDetail />} />
+              <Route path="/progress" element={<Progress />} />
+              <Route path="/collaborators" element={<Collaborators />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/company" element={<Company />} />
+              <Route path="/settings" element={<Settings />} />
               
               {/* Admin routes */}
               <Route path="/admin" element={<AdminDashboard />} />

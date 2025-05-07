@@ -15,6 +15,7 @@ export const fetchTrainings = async () => {
     .order("created_at", { ascending: false });
   
   if (error) {
+    console.error("Erro ao buscar treinamentos:", error);
     throw error;
   }
   
@@ -29,6 +30,7 @@ export const fetchTrainingById = async (id: string) => {
     .single();
   
   if (error) {
+    console.error("Erro ao buscar treinamento por ID:", error);
     throw error;
   }
   
@@ -43,6 +45,7 @@ export const createTraining = async (training: Omit<Training, "id" | "created_at
     .single();
   
   if (error) {
+    console.error("Erro ao criar treinamento:", error);
     throw error;
   }
   
@@ -58,6 +61,7 @@ export const updateTraining = async (id: string, updates: Partial<Training>) => 
     .single();
   
   if (error) {
+    console.error("Erro ao atualizar treinamento:", error);
     throw error;
   }
   
@@ -71,25 +75,32 @@ export const deleteTraining = async (id: string) => {
     .eq("id", id);
   
   if (error) {
+    console.error("Erro ao deletar treinamento:", error);
     throw error;
   }
 };
 
 // Training Assignments
 export const fetchAssignedTrainings = async (userId: string) => {
-  const { data, error } = await supabase
-    .from("training_assignments")
-    .select(`
-      *,
-      training:trainings (*)
-    `)
-    .eq("user_id", userId);
-  
-  if (error) {
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from("training_assignments")
+      .select(`
+        *,
+        training:trainings (*)
+      `)
+      .eq("user_id", userId);
+    
+    if (error) {
+      console.error("Erro ao buscar treinamentos atribuídos:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Erro capturado ao buscar treinamentos atribuídos:", error);
+    return [];
   }
-  
-  return data;
 };
 
 export const assignTraining = async (trainingId: string, userIds: string[]) => {
@@ -104,6 +115,7 @@ export const assignTraining = async (trainingId: string, userIds: string[]) => {
     .select();
   
   if (error) {
+    console.error("Erro ao atribuir treinamento:", error);
     throw error;
   }
   
@@ -117,9 +129,10 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
     .select("*")
     .eq("training_id", trainingId)
     .eq("user_id", userId)
-    .single();
+    .maybeSingle(); // Usando maybeSingle em vez de single para evitar erros
   
-  if (error && error.code !== "PGRST116") { // Not found is okay
+  if (error) {
+    console.error("Erro ao buscar progresso do treinamento:", error);
     throw error;
   }
   
@@ -127,6 +140,10 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
 };
 
 export const updateTrainingProgress = async (trainingId: string, userId: string, progressPct: number, completed: boolean = false) => {
+  // Primeiro tenta buscar se já existe um registro de progresso
+  const existingProgress = await fetchTrainingProgress(trainingId, userId);
+  
+  // Prepara os dados para atualização ou criação
   const updates: Partial<TrainingProgress> = {
     progress_pct: progressPct,
     last_viewed_at: new Date().toISOString(),
@@ -136,32 +153,82 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
     updates.completed_at = new Date().toISOString();
   }
   
-  const { data, error } = await supabase
-    .from("training_progress")
-    .update(updates)
-    .eq("training_id", trainingId)
-    .eq("user_id", userId)
-    .select();
-  
-  if (error) {
+  try {
+    // Se já existe um registro, atualize-o
+    if (existingProgress) {
+      const { data, error } = await supabase
+        .from("training_progress")
+        .update(updates)
+        .eq("training_id", trainingId)
+        .eq("user_id", userId)
+        .select();
+      
+      if (error) throw error;
+      return data;
+    } 
+    // Se não existe, crie um novo
+    else {
+      const { data, error } = await supabase
+        .from("training_progress")
+        .insert({
+          training_id: trainingId,
+          user_id: userId,
+          ...updates
+        })
+        .select();
+      
+      if (error) throw error;
+      return data;
+    }
+  } catch (error: any) {
+    console.error("Erro ao atualizar progresso:", error);
     throw error;
   }
-  
-  return data;
 };
 
 // Users
 export const fetchCompanyUsers = async () => {
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .order("name");
-  
-  if (error) {
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("name");
+    
+    if (error) {
+      console.error("Erro ao buscar usuários da empresa:", error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Erro capturado ao buscar usuários:", error);
+    return [];
   }
-  
-  return data;
+};
+
+// Função para obter o perfil do usuário atual
+export const fetchCurrentUser = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) return null;
+    
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Erro ao buscar perfil do usuário:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Erro ao buscar usuário atual:", error);
+    return null;
+  }
 };
 
 // Storage
@@ -175,6 +242,7 @@ export const uploadTrainingVideo = async (file: File) => {
     .upload(filePath, file);
   
   if (error) {
+    console.error("Erro ao fazer upload do vídeo:", error);
     throw error;
   }
   
