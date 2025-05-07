@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -269,10 +268,11 @@ export const fetchCompanyUsers = async () => {
   }
 };
 
-// Função para obter o perfil do usuário atual
+// Function to get the current user's profile with company_id
 export const fetchCurrentUser = async () => {
   try {
     console.log("Fetching current user");
+    // First get the authenticated user
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -282,20 +282,7 @@ export const fetchCurrentUser = async () => {
     
     console.log("User from auth:", user);
     
-    // Use RPC (Remote Procedure Call) para chamar a função SQL segura
-    // Isso evita o problema de recursão infinita
-    const { data: userData, error } = await supabase.rpc('get_user_company_id', {
-      user_id: user.id
-    });
-    
-    if (error) {
-      console.error("Erro ao buscar company_id do usuário:", error);
-      return null;
-    }
-    
-    console.log("User company_id from rpc:", userData);
-    
-    // Agora buscamos o perfil completo do usuário
+    // Directly query the users table for the complete profile
     const { data: userProfile, error: profileError } = await supabase
       .from("users")
       .select("*")
@@ -303,19 +290,19 @@ export const fetchCurrentUser = async () => {
       .maybeSingle();
     
     if (profileError) {
-      console.error("Erro ao buscar perfil do usuário:", profileError);
+      console.error("Error fetching user profile:", profileError);
+      throw profileError;
+    }
+    
+    if (!userProfile) {
+      console.error("User profile not found in database");
       return null;
     }
     
-    // Garantimos que o company_id esteja presente
-    if (userProfile && !userProfile.company_id && userData) {
-      userProfile.company_id = userData;
-    }
-    
-    console.log("Current user profile fetched:", userProfile);
+    console.log("User profile from database:", userProfile);
     return userProfile;
   } catch (error) {
-    console.error("Erro ao buscar usuário atual:", error);
+    console.error("Error fetching current user:", error);
     return null;
   }
 };

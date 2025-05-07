@@ -27,7 +27,9 @@ const TrainingForm = () => {
   
   // State to hold the company ID
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [fetchingCompanyId, setFetchingCompanyId] = useState(true);
 
+  // State to hold the form data
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -54,15 +56,25 @@ const TrainingForm = () => {
   useEffect(() => {
     const getCompanyId = async () => {
       try {
+        setFetchingCompanyId(true);
+        setError(null);
+        console.log("Fetching company ID...");
+        
         const currentUser = await fetchCurrentUser();
+        console.log("Current user data:", currentUser);
+        
         if (currentUser && currentUser.company_id) {
+          console.log("Company ID found:", currentUser.company_id);
           setCompanyId(currentUser.company_id);
         } else {
-          setError("Não foi possível obter o ID da empresa");
+          console.error("No company ID found in user data");
+          setError("Não foi possível obter o ID da empresa. Verifique se você está logado corretamente.");
         }
       } catch (err) {
         console.error("Error fetching company ID:", err);
-        setError("Erro ao obter o ID da empresa");
+        setError("Erro ao obter o ID da empresa. Por favor, tente novamente mais tarde.");
+      } finally {
+        setFetchingCompanyId(false);
       }
     };
     
@@ -213,6 +225,8 @@ const TrainingForm = () => {
         visibility: formData.visibility
       };
       
+      console.log("Submitting training data:", trainingData);
+      
       // Create or update training
       if (isEditMode && id) {
         await updateTraining(id, trainingData);
@@ -243,6 +257,20 @@ const TrainingForm = () => {
       setSubmitting(false);
     }
   };
+
+  // Show loading state when fetching company ID
+  if (fetchingCompanyId) {
+    return (
+      <Layout>
+        <div className="container mx-auto py-6">
+          <div className="flex justify-center py-12">
+            <Loader className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Carregando informações da empresa...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

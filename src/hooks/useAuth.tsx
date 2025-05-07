@@ -23,9 +23,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log("Setting up auth state listener");
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state change:", event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -38,19 +40,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // THEN check for existing session
     const getSession = async () => {
       try {
+        console.log("Getting existing session");
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
+        console.log("Got session:", session?.user?.id);
         setLoading(false);
       } catch (error) {
-        console.error('Erro ao recuperar sessão:', error);
+        console.error('Error retrieving session:', error);
         setLoading(false);
       }
     };
     
     getSession();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("Unsubscribing from auth state changes");
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const signIn = async (email: string, password: string) => {

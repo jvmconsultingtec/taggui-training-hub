@@ -13,7 +13,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    storage: localStorage
+    storage: typeof window !== 'undefined' ? localStorage : undefined
   }
 });
 
@@ -27,11 +27,11 @@ async function initStorage() {
     if (!buckets || !buckets.find(bucket => bucket.name === 'training_videos')) {
       console.log("Training videos bucket not found. Creating it now...");
       
-      // Create the bucket
+      // Create the bucket with a smaller file size limit to avoid 413 errors
       const { data, error } = await supabase.storage
         .createBucket('training_videos', {
           public: true, // Make files publicly accessible
-          fileSizeLimit: 1024 * 1024 * 100, // 100MB file size limit
+          fileSizeLimit: 1024 * 1024 * 50, // 50MB file size limit (reduced from 100MB)
         });
       
       if (error) {
@@ -48,4 +48,6 @@ async function initStorage() {
 }
 
 // Initialize storage when the client is imported
-initStorage();
+if (typeof window !== 'undefined') {
+  initStorage();
+}
