@@ -16,6 +16,3 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: typeof window !== 'undefined' ? localStorage : undefined
   }
 });
-
-// Set storage initialization to be conditional based on authentication
-// to prevent RLS errors when not authenticated

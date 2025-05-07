@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -8,272 +9,18 @@ type TrainingAssignment = Database["public"]["Tables"]["training_assignments"]["
 type VideoType = Database["public"]["Enums"]["video_type"];
 type Visibility = Database["public"]["Enums"]["visibility"];
 
-// Trainings
-export const fetchTrainings = async () => {
-  try {
-    console.log("Fetching trainings...");
-    const { data, error } = await supabase
-      .from("trainings")
-      .select("*")
-      .order("created_at", { ascending: false });
-    
-    if (error) {
-      console.error("Erro ao buscar treinamentos:", error);
-      throw error;
-    }
-    
-    console.log("Trainings fetched:", data);
-    return data || [];
-  } catch (error) {
-    console.error("Erro capturado ao buscar treinamentos:", error);
-    return [];
-  }
-};
-
-export const fetchTrainingById = async (id: string) => {
-  try {
-    console.log("Fetching training by ID:", id);
-    const { data, error } = await supabase
-      .from("trainings")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-    
-    if (error) {
-      console.error("Erro ao buscar treinamento por ID:", error);
-      throw error;
-    }
-    
-    console.log("Training fetched:", data);
-    return data;
-  } catch (error) {
-    console.error("Erro capturado ao buscar treinamento por ID:", error);
-    throw error;
-  }
-};
-
-export const createTraining = async (training: Omit<Training, "id" | "created_at">) => {
-  try {
-    console.log("Creating training:", training);
-    const { data, error } = await supabase
-      .from("trainings")
-      .insert(training)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error("Erro ao criar treinamento:", error);
-      throw error;
-    }
-    
-    console.log("Training created:", data);
-    return data;
-  } catch (error) {
-    console.error("Erro capturado ao criar treinamento:", error);
-    throw error;
-  }
-};
-
-export const updateTraining = async (id: string, updates: Partial<Training>) => {
-  try {
-    console.log("Updating training:", id, updates);
-    const { data, error } = await supabase
-      .from("trainings")
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error("Erro ao atualizar treinamento:", error);
-      throw error;
-    }
-    
-    console.log("Training updated:", data);
-    return data;
-  } catch (error) {
-    console.error("Erro capturado ao atualizar treinamento:", error);
-    throw error;
-  }
-};
-
-export const deleteTraining = async (id: string) => {
-  try {
-    console.log("Deleting training:", id);
-    const { error } = await supabase
-      .from("trainings")
-      .delete()
-      .eq("id", id);
-    
-    if (error) {
-      console.error("Erro ao deletar treinamento:", error);
-      throw error;
-    }
-    console.log("Training deleted successfully");
-  } catch (error) {
-    console.error("Erro capturado ao deletar treinamento:", error);
-    throw error;
-  }
-};
-
-// Training Assignments
-export const fetchAssignedTrainings = async (userId: string) => {
-  try {
-    console.log("Fetching assigned trainings for user:", userId);
-    const { data, error } = await supabase
-      .from("training_assignments")
-      .select(`
-        *,
-        training:trainings (*)
-      `)
-      .eq("user_id", userId);
-    
-    if (error) {
-      console.error("Erro ao buscar treinamentos atribuídos:", error);
-      throw error;
-    }
-    
-    console.log("Assigned trainings fetched:", data);
-    return data || [];
-  } catch (error) {
-    console.error("Erro capturado ao buscar treinamentos atribuídos:", error);
-    return [];
-  }
-};
-
-export const assignTraining = async (trainingId: string, userIds: string[]) => {
-  try {
-    console.log("Assigning training:", trainingId, "to users:", userIds);
-    const assignments = userIds.map(userId => ({
-      training_id: trainingId,
-      user_id: userId
-    }));
-    
-    const { data, error } = await supabase
-      .from("training_assignments")
-      .insert(assignments)
-      .select();
-    
-    if (error) {
-      console.error("Erro ao atribuir treinamento:", error);
-      throw error;
-    }
-    
-    console.log("Training assigned:", data);
-    return data;
-  } catch (error) {
-    console.error("Erro capturado ao atribuir treinamento:", error);
-    throw error;
-  }
-};
-
-// Training Progress
-export const fetchTrainingProgress = async (trainingId: string, userId: string) => {
-  try {
-    console.log("Fetching training progress:", trainingId, userId);
-    const { data, error } = await supabase
-      .from("training_progress")
-      .select("*")
-      .eq("training_id", trainingId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    
-    if (error) {
-      console.error("Erro ao buscar progresso do treinamento:", error);
-      throw error;
-    }
-    
-    console.log("Training progress fetched:", data);
-    return data;
-  } catch (error) {
-    console.error("Erro capturado ao buscar progresso do treinamento:", error);
-    return null;
-  }
-};
-
-export const updateTrainingProgress = async (trainingId: string, userId: string, progressPct: number, completed: boolean = false) => {
-  try {
-    console.log("Updating training progress:", trainingId, userId, progressPct, completed);
-    // Primeiro tenta buscar se já existe um registro de progresso
-    const existingProgress = await fetchTrainingProgress(trainingId, userId);
-    
-    // Prepara os dados para atualização ou criação
-    const updates: Partial<TrainingProgress> = {
-      progress_pct: progressPct,
-      last_viewed_at: new Date().toISOString(),
-    };
-    
-    if (completed) {
-      updates.completed_at = new Date().toISOString();
-    }
-    
-    try {
-      // Se já existe um registro, atualize-o
-      if (existingProgress) {
-        const { data, error } = await supabase
-          .from("training_progress")
-          .update(updates)
-          .eq("training_id", trainingId)
-          .eq("user_id", userId)
-          .select();
-        
-        if (error) throw error;
-        console.log("Training progress updated:", data);
-        return data;
-      } 
-      // Se não existe, crie um novo
-      else {
-        const { data, error } = await supabase
-          .from("training_progress")
-          .insert({
-            training_id: trainingId,
-            user_id: userId,
-            ...updates
-          })
-          .select();
-        
-        if (error) throw error;
-        console.log("Training progress created:", data);
-        return data;
-      }
-    } catch (error: any) {
-      console.error("Erro ao atualizar progresso:", error);
-      throw error;
-    }
-  } catch (error) {
-    console.error("Erro capturado ao atualizar progresso do treinamento:", error);
-    throw error;
-  }
+// Helper function for basic error handling
+const handleError = (error: any, message: string) => {
+  console.error(message, error);
+  throw error;
 };
 
 // Users
-export const fetchCompanyUsers = async () => {
-  try {
-    console.log("Fetching company users");
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .order("name");
-    
-    if (error) {
-      console.error("Erro ao buscar usuários da empresa:", error);
-      throw error;
-    }
-    
-    console.log("Company users fetched:", data);
-    return data || [];
-  } catch (error) {
-    console.error("Erro capturado ao buscar usuários:", error);
-    return [];
-  }
-};
-
-// Updated function to get the current user's profile without recursion
 export const fetchCurrentUser = async () => {
   try {
     console.log("Fetching current user data");
     
-    // First get the authenticated user from auth
+    // Get the current authenticated user from auth
     const { data: { user: authUser } } = await supabase.auth.getUser();
     
     if (!authUser) {
@@ -283,61 +30,26 @@ export const fetchCurrentUser = async () => {
     
     console.log("Auth user found:", authUser.id);
     
-    // Direct query to users table with explicit ID to prevent RLS issues
-    const { data: userProfile, error: profileError } = await supabase
+    // Direct query to users table with explicit ID
+    const { data: userProfile, error } = await supabase
       .from("users")
       .select("*")
       .eq("id", authUser.id)
-      .maybeSingle();
+      .single();
     
-    if (profileError) {
-      console.error("Error fetching user profile:", profileError);
-      
-      // Fallback to auth metadata if available
-      if (authUser.user_metadata?.company_id) {
+    if (error) {
+      console.error("Error fetching user profile:", error);
+      // Try to use auth metadata as fallback
+      if (authUser.user_metadata) {
         return {
           id: authUser.id,
           email: authUser.email || "",
-          name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "",
-          company_id: authUser.user_metadata.company_id,
-          role: authUser.user_metadata?.role || "COLLABORATOR",
-          created_at: authUser.created_at
+          name: authUser.user_metadata.name || authUser.email?.split("@")[0] || "",
+          company_id: authUser.user_metadata.company_id || "00000000-0000-0000-0000-000000000000",
+          role: authUser.user_metadata.role || "COLLABORATOR"
         };
       }
-      
       return null;
-    }
-    
-    if (!userProfile) {
-      // Try to create profile if it doesn't exist
-      console.warn("User profile not found in database, attempting to create from metadata");
-      
-      const companyId = authUser.user_metadata?.company_id || "00000000-0000-0000-0000-000000000000";
-      const userName = authUser.user_metadata?.name || authUser.email?.split("@")[0] || "";
-      
-      try {
-        const { data: newProfile, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            id: authUser.id,
-            email: authUser.email || "",
-            name: userName,
-            company_id: companyId
-          })
-          .select()
-          .single();
-          
-        if (insertError) {
-          console.error("Error creating user profile:", insertError);
-          return null;
-        }
-        
-        console.log("Created new user profile:", newProfile);
-        return newProfile;
-      } catch (error) {
-        console.error("Failed to create user profile:", error);
-        return null;
-      }
     }
     
     console.log("User profile found:", userProfile);
@@ -348,10 +60,202 @@ export const fetchCurrentUser = async () => {
   }
 };
 
-// New function to fetch all training progress for a user
+export const fetchCompanyUsers = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("name");
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    handleError(error, "Error fetching company users:");
+    return [];
+  }
+};
+
+// Trainings
+export const fetchTrainings = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("trainings")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    handleError(error, "Error fetching trainings:");
+    return [];
+  }
+};
+
+export const fetchTrainingById = async (id: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("trainings")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    handleError(error, "Error fetching training by ID:");
+    throw error;
+  }
+};
+
+export const createTraining = async (training: Omit<Training, "id" | "created_at">) => {
+  try {
+    const { data, error } = await supabase
+      .from("trainings")
+      .insert(training)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    handleError(error, "Error creating training:");
+    throw error;
+  }
+};
+
+export const updateTraining = async (id: string, updates: Partial<Training>) => {
+  try {
+    const { data, error } = await supabase
+      .from("trainings")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    handleError(error, "Error updating training:");
+    throw error;
+  }
+};
+
+export const deleteTraining = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from("trainings")
+      .delete()
+      .eq("id", id);
+    
+    if (error) throw error;
+  } catch (error) {
+    handleError(error, "Error deleting training:");
+    throw error;
+  }
+};
+
+// Training Assignments
+export const fetchAssignedTrainings = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("training_assignments")
+      .select(`
+        *,
+        training:trainings (*)
+      `)
+      .eq("user_id", userId);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    handleError(error, "Error fetching assigned trainings:");
+    return [];
+  }
+};
+
+export const assignTraining = async (trainingId: string, userIds: string[]) => {
+  try {
+    const assignments = userIds.map(userId => ({
+      training_id: trainingId,
+      user_id: userId
+    }));
+    
+    const { data, error } = await supabase
+      .from("training_assignments")
+      .insert(assignments)
+      .select();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    handleError(error, "Error assigning training:");
+    throw error;
+  }
+};
+
+// Training Progress
+export const fetchTrainingProgress = async (trainingId: string, userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("training_progress")
+      .select("*")
+      .eq("training_id", trainingId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    handleError(error, "Error fetching training progress:");
+    return null;
+  }
+};
+
+export const updateTrainingProgress = async (trainingId: string, userId: string, progressPct: number, completed: boolean = false) => {
+  try {
+    // Check if progress record exists
+    const existingProgress = await fetchTrainingProgress(trainingId, userId);
+    
+    // Prepare data for update or create
+    const updates = {
+      progress_pct: progressPct,
+      last_viewed_at: new Date().toISOString(),
+      ...(completed ? { completed_at: new Date().toISOString() } : {})
+    };
+    
+    if (existingProgress) {
+      // Update existing record
+      const { data, error } = await supabase
+        .from("training_progress")
+        .update(updates)
+        .eq("training_id", trainingId)
+        .eq("user_id", userId)
+        .select();
+      
+      if (error) throw error;
+      return data;
+    } else {
+      // Create new record
+      const { data, error } = await supabase
+        .from("training_progress")
+        .insert({
+          training_id: trainingId,
+          user_id: userId,
+          ...updates
+        })
+        .select();
+      
+      if (error) throw error;
+      return data;
+    }
+  } catch (error) {
+    handleError(error, "Error updating training progress:");
+    throw error;
+  }
+};
+
 export const fetchUserTrainingProgress = async (userId: string) => {
   try {
-    console.log("Fetching user training progress:", userId);
     const { data, error } = await supabase
       .from("training_progress")
       .select(`
@@ -361,15 +265,10 @@ export const fetchUserTrainingProgress = async (userId: string) => {
       .eq("user_id", userId)
       .order("last_viewed_at", { ascending: false });
     
-    if (error) {
-      console.error("Erro ao buscar progresso de treinamentos do usuário:", error);
-      throw error;
-    }
-    
-    console.log("User training progress fetched:", data);
+    if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error("Erro capturado ao buscar progresso de treinamentos:", error);
+    handleError(error, "Error fetching user training progress:");
     return [];
   }
 };
@@ -377,7 +276,6 @@ export const fetchUserTrainingProgress = async (userId: string) => {
 // Storage
 export const uploadTrainingVideo = async (file: File) => {
   try {
-    console.log("Uploading training video:", file.name);
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     const filePath = `uploads/${fileName}`;
@@ -386,19 +284,15 @@ export const uploadTrainingVideo = async (file: File) => {
       .from('training_videos')
       .upload(filePath, file);
     
-    if (error) {
-      console.error("Erro ao fazer upload do vídeo:", error);
-      throw error;
-    }
+    if (error) throw error;
     
     const { data } = supabase.storage
       .from('training_videos')
       .getPublicUrl(filePath);
     
-    console.log("Video uploaded, public URL:", data.publicUrl);
     return data.publicUrl;
   } catch (error) {
-    console.error("Erro capturado ao fazer upload do vídeo:", error);
+    handleError(error, "Error uploading training video:");
     throw error;
   }
 };

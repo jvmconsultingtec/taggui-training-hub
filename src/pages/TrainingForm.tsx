@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { fetchTrainingById, createTraining, updateTraining, uploadTrainingVideo, fetchCurrentUser } from "@/services/api";
+import { fetchTrainingById, createTraining, updateTraining, uploadTrainingVideo } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Upload, Loader, Plus, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -52,40 +53,55 @@ const TrainingForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
-  // Fetch the user's company_id
+
+  // Get company ID directly from user auth metadata
   useEffect(() => {
     const getCompanyId = async () => {
       try {
         setFetchingCompanyId(true);
         setError(null);
-        console.log("Fetching company ID...");
         
-        // First verify if user is authenticated
         if (!user) {
-          console.error("User not authenticated");
           setError("User not authenticated. Please login again.");
           setFetchingCompanyId(false);
           return;
         }
+
+        // Get current user
+        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
         
-        // Use direct query to get user profile with company_id
+        if (authError || !currentUser) {
+          console.error("Auth error:", authError);
+          setError("Authentication error. Please login again.");
+          setFetchingCompanyId(false);
+          return;
+        }
+
+        // Get user profile from users table
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('company_id')
-          .eq('id', user.id)
+          .eq('id', currentUser.id)
           .single();
         
         if (userError) {
           console.error("Error fetching user data:", userError);
-          setError("Failed to get user data: " + userError.message);
+          
+          // Fallback to user metadata
+          if (currentUser.user_metadata?.company_id) {
+            console.log("Using company ID from user metadata:", currentUser.user_metadata.company_id);
+            setCompanyId(currentUser.user_metadata.company_id);
+            setFetchingCompanyId(false);
+            return;
+          }
+          
+          setError("Could not get company ID. Please contact support.");
           setFetchingCompanyId(false);
           return;
         }
         
         if (!userData || !userData.company_id) {
-          console.error("No company ID found in user data");
-          setError("Could not obtain company ID. User is not associated with any company.");
+          setError("User is not associated with any company.");
           setFetchingCompanyId(false);
           return;
         }
@@ -94,8 +110,8 @@ const TrainingForm = () => {
         setCompanyId(userData.company_id);
         setFetchingCompanyId(false);
       } catch (err: any) {
-        console.error("Error fetching company ID:", err);
-        setError("Error getting company ID: " + (err.message || "Unknown error"));
+        console.error("Error in getCompanyId:", err);
+        setError("Error: " + (err.message || "Unknown error"));
         setFetchingCompanyId(false);
       }
     };
@@ -114,7 +130,6 @@ const TrainingForm = () => {
           const training = await fetchTrainingById(id);
           
           if (training) {
-            // Set form data from training
             setFormData({
               title: training.title || "",
               description: training.description || "",
@@ -196,7 +211,7 @@ const TrainingForm = () => {
       }
       
       if (!companyId) {
-        throw new Error("Company ID not available. Verify your link with a company.");
+        throw new Error("Company ID not available. Please try refreshing the page.");
       }
       
       // Validate form
@@ -216,15 +231,9 @@ const TrainingForm = () => {
       let videoUrl = formData.videoUrl;
       if (file && formData.videoType === "UPLOAD") {
         try {
-          // Simulate upload progress updates
+          // Update progress
           const progressInterval = setInterval(() => {
-            setUploadProgress(prev => {
-              if (prev >= 90) {
-                clearInterval(progressInterval);
-                return 90;
-              }
-              return prev + 10;
-            });
+            setUploadProgress(prev => Math.min(prev + 10, 90));
           }, 500);
           
           videoUrl = await uploadTrainingVideo(file);
@@ -264,7 +273,7 @@ const TrainingForm = () => {
         });
       }
       
-      // Navigate back to trainings list
+      // Navigate back
       navigate("/trainings");
       
     } catch (err: any) {
@@ -280,7 +289,7 @@ const TrainingForm = () => {
     }
   };
 
-  // Show loading state when fetching company ID
+  // Show loading state during fetch
   if (fetchingCompanyId) {
     return (
       <Layout>
@@ -293,15 +302,11 @@ const TrainingForm = () => {
       </Layout>
     );
   }
-  
-  const handleRetry = () => {
-    navigate('/dashboard'); // Redirect to dashboard
-  };
 
   return (
     <Layout>
       <div className="container mx-auto py-6">
-        {/* Header with back button */}
+        {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Button 
             variant="ghost" 
@@ -334,7 +339,7 @@ const TrainingForm = () => {
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
             <div className="mt-4">
-              <Button onClick={handleRetry} variant="outline">
+              <Button onClick={() => navigate('/dashboard')} variant="outline">
                 Go back to Dashboard
               </Button>
             </div>
@@ -371,7 +376,7 @@ const TrainingForm = () => {
                 
                 {/* Video Type */}
                 <div className="space-y-2">
-                  <Label>Tipo de vídeo</Label>
+                  <Label>Video Type</Label>
                   <RadioGroup 
                     value={formData.videoType}
                     onValueChange={handleRadioChange}
@@ -383,7 +388,7 @@ const TrainingForm = () => {
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="UPLOAD" id="video-upload" />
-                      <Label htmlFor="video-upload">Upload de arquivo</Label>
+                      <Label htmlFor="video-upload">File upload</Label>
                     </div>
                   </RadioGroup>
                 </div>
