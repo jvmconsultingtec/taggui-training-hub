@@ -62,6 +62,13 @@ export const fetchCurrentUser = async () => {
 
 export const fetchCompanyUsers = async () => {
   try {
+    // Ensure we have a valid session before making the request
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No authenticated session found");
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -79,18 +86,25 @@ export const fetchCompanyUsers = async () => {
 export const fetchTrainings = async () => {
   try {
     // Get authenticated user first to ensure we have a valid session
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       console.error("No authenticated user found");
       return [];
     }
+    
+    console.log("Fetching trainings with session:", session?.access_token ? "Token exists" : "No token");
 
     const { data, error } = await supabase
       .from("trainings")
       .select("*")
       .order("created_at", { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching trainings:", error);
+      throw error;
+    }
+    
+    console.log("Trainings fetched:", data?.length || 0);
     return data || [];
   } catch (error) {
     handleError(error, "Error fetching trainings:");
@@ -100,6 +114,13 @@ export const fetchTrainings = async () => {
 
 export const fetchTrainingById = async (id: string) => {
   try {
+    // Verify we have an authenticated session before making the request
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No authenticated session found");
+      throw new Error("Authentication required");
+    }
+    
     const { data, error } = await supabase
       .from("trainings")
       .select("*")

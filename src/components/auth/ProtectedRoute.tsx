@@ -2,6 +2,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
 
 interface ProtectedRouteProps {
   requiredRole?: "ADMIN" | "MANAGER" | "COLLABORATOR";
@@ -12,10 +13,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredRole,
   redirectTo = "/login",
 }) => {
-  const { user, loading } = useAuth();
+  const { user, session, loading } = useAuth();
+  const [authChecked, setAuthChecked] = useState(false);
+  
+  useEffect(() => {
+    // Wait a small amount of time to ensure auth state is correctly initialized
+    const timer = setTimeout(() => {
+      setAuthChecked(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // Show loading state
-  if (loading) {
+  if (loading || !authChecked) {
     return (
       <div className="flex flex-col gap-4 p-8">
         <Skeleton className="h-8 w-full" />
@@ -26,12 +37,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
+  // Check if session is valid
+  if (!user || !session) {
+    console.log("No authenticated user or session found, redirecting to login");
     return <Navigate to={redirectTo} replace />;
   }
 
-  // Display children only if user is authenticated, 
+  // Check if session is expired
+  const isSessionExpired = session.expires_at * 1000 < Date.now();
+  if (isSessionExpired) {
+    console.log("Session expired, redirecting to login");
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  // Display children only if user is authenticated
   // Role-based check would be implemented here when user roles are fetched
   return <Outlet />;
 };

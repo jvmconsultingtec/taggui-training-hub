@@ -32,18 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         console.log("Initializing auth state");
         
-        // Get current session
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        
-        if (currentSession) {
-          setUser(currentSession.user);
-          setSession(currentSession);
-          console.log("Active session found for user:", currentSession.user.id);
-        } else {
-          console.log("No active session found");
-        }
-        
-        // Listen for auth changes
+        // Set up auth state listener FIRST
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, sessionData) => {
             console.log("Auth state change:", event, sessionData?.user?.id);
@@ -52,14 +41,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setSession(sessionData);
             
             if (event === 'SIGNED_OUT') {
+              console.log("User signed out, navigating to login");
               navigate('/login');
             } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              console.log("User signed in or token refreshed");
               const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
               localStorage.removeItem('returnUrl');
               navigate(returnUrl);
             }
           }
         );
+        
+        // THEN check for existing session
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (currentSession) {
+          console.log("Active session found for user:", currentSession.user.id);
+          setUser(currentSession.user);
+          setSession(currentSession);
+        } else {
+          console.log("No active session found");
+        }
         
         return () => {
           subscription.unsubscribe();
