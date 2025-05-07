@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -9,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { fetchTrainingById, createTraining, updateTraining, uploadTrainingVideo } from "@/services/api";
+import { fetchTrainingById, createTraining, updateTraining, uploadTrainingVideo, fetchCurrentUser } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft, Upload, Loader, Plus, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -25,6 +24,9 @@ const TrainingForm = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const isEditMode = Boolean(id);
+  
+  // State to hold the company ID
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -47,6 +49,25 @@ const TrainingForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Fetch the user's company_id
+  useEffect(() => {
+    const getCompanyId = async () => {
+      try {
+        const currentUser = await fetchCurrentUser();
+        if (currentUser && currentUser.company_id) {
+          setCompanyId(currentUser.company_id);
+        } else {
+          setError("Não foi possível obter o ID da empresa");
+        }
+      } catch (err) {
+        console.error("Error fetching company ID:", err);
+        setError("Erro ao obter o ID da empresa");
+      }
+    };
+    
+    getCompanyId();
+  }, []);
   
   // Fetch training if in edit mode
   useEffect(() => {
@@ -140,6 +161,10 @@ const TrainingForm = () => {
         throw new Error("Usuário não autenticado");
       }
       
+      if (!companyId) {
+        throw new Error("ID da empresa não disponível");
+      }
+      
       // Validate form
       if (!formData.title) {
         throw new Error("O título é obrigatório");
@@ -184,7 +209,7 @@ const TrainingForm = () => {
         video_url: videoUrl,
         duration_min: parseInt(formData.durationMin, 10) || 10,
         tags: tags,
-        company_id: user.company_id,
+        company_id: companyId,
         visibility: formData.visibility
       };
       
@@ -430,7 +455,7 @@ const TrainingForm = () => {
                       Cancelar
                     </Button>
                   </Link>
-                  <Button type="submit" disabled={submitting}>
+                  <Button type="submit" disabled={submitting || !companyId}>
                     {submitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
                     {isEditMode ? "Salvar alterações" : "Criar treinamento"}
                   </Button>
