@@ -9,7 +9,7 @@ type AuthContextType = {
   user: User | null;
   session: Session | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, companyId: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   loading: boolean;
 };
@@ -70,9 +70,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, companyId: string) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
       setLoading(true);
+      
+      // Usar a empresa padrão que criamos no banco de dados
+      const companyId = "00000000-0000-0000-0000-000000000000";
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -90,9 +94,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       toast({
         title: "Conta criada com sucesso",
-        description: "Verifique seu email para confirmar o registro"
+        description: "Você já pode fazer login com suas credenciais"
       });
+      
+      // Direcionar para a página de login após o cadastro
+      navigate('/login');
+      
     } catch (error: any) {
+      console.error("Erro detalhado:", error);
       toast({
         title: "Erro no cadastro",
         description: error.message || "Não foi possível criar a conta",

@@ -28,11 +28,7 @@ const Register = () => {
       return;
     }
     
-    // Para fins de demonstração, vamos usar um ID de empresa fixo
-    // Em uma aplicação real, isso seria obtido de outra forma
-    const companyId = "00000000-0000-0000-0000-000000000000";
-    
-    await signUp(email, password, name, companyId);
+    await signUp(email, password, name);
   };
 
   return (
