@@ -14,6 +14,7 @@ import { ArrowLeft, Upload, Loader, Plus, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Database } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 // Define the VideoType type from the Database types
 type VideoType = Database["public"]["Enums"]["video_type"];
@@ -60,38 +61,41 @@ const TrainingForm = () => {
         setError(null);
         console.log("Fetching company ID...");
         
-        // Primeiro verificamos se o usuário está autenticado
+        // First verify if user is authenticated
         if (!user) {
           console.error("User not authenticated");
-          setError("Usuário não autenticado. Por favor, faça login novamente.");
+          setError("User not authenticated. Please login again.");
           setFetchingCompanyId(false);
           return;
         }
         
-        // Buscamos as informações do usuário com a função corrigida
-        const currentUser = await fetchCurrentUser();
-        console.log("Current user data from fetchCurrentUser:", currentUser);
+        // Use direct query to get user profile with company_id
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
         
-        if (!currentUser) {
-          console.error("User not found in database");
-          setError("Não foi possível obter os dados do usuário. Verifique se você está logado corretamente.");
+        if (userError) {
+          console.error("Error fetching user data:", userError);
+          setError("Failed to get user data: " + userError.message);
           setFetchingCompanyId(false);
           return;
         }
         
-        if (!currentUser.company_id) {
+        if (!userData || !userData.company_id) {
           console.error("No company ID found in user data");
-          setError("Não foi possível obter o ID da empresa. O usuário não tem vínculo com nenhuma empresa.");
+          setError("Could not obtain company ID. User is not associated with any company.");
           setFetchingCompanyId(false);
           return;
         }
         
-        console.log("Company ID found:", currentUser.company_id);
-        setCompanyId(currentUser.company_id);
+        console.log("Company ID found:", userData.company_id);
+        setCompanyId(userData.company_id);
         setFetchingCompanyId(false);
       } catch (err: any) {
         console.error("Error fetching company ID:", err);
-        setError("Erro ao obter o ID da empresa: " + (err.message || "Erro desconhecido"));
+        setError("Error getting company ID: " + (err.message || "Unknown error"));
         setFetchingCompanyId(false);
       }
     };
@@ -125,11 +129,11 @@ const TrainingForm = () => {
               setTags(training.tags);
             }
           } else {
-            setError("Treinamento não encontrado");
+            setError("Training not found");
           }
         } catch (err: any) {
           console.error("Error fetching training:", err);
-          setError(`Erro ao carregar treinamento: ${err.message || "Erro desconhecido"}`);
+          setError(`Error loading training: ${err.message || "Unknown error"}`);
         } finally {
           setLoading(false);
         }
@@ -188,24 +192,24 @@ const TrainingForm = () => {
       setUploadProgress(0);
       
       if (!user) {
-        throw new Error("Usuário não autenticado. Por favor, faça login novamente.");
+        throw new Error("User not authenticated. Please login again.");
       }
       
       if (!companyId) {
-        throw new Error("ID da empresa não disponível. Verifique seu vínculo com uma empresa.");
+        throw new Error("Company ID not available. Verify your link with a company.");
       }
       
       // Validate form
       if (!formData.title) {
-        throw new Error("O título é obrigatório");
+        throw new Error("Title is required");
       }
       
       if (formData.videoType === "YOUTUBE" && !formData.videoUrl) {
-        throw new Error("A URL do vídeo é obrigatória");
+        throw new Error("YouTube URL is required");
       }
       
       if (formData.videoType === "UPLOAD" && !file && !isEditMode) {
-        throw new Error("Você deve fazer upload de um vídeo");
+        throw new Error("You must upload a video");
       }
       
       // Upload file if needed
@@ -227,7 +231,7 @@ const TrainingForm = () => {
           clearInterval(progressInterval);
           setUploadProgress(100);
         } catch (err: any) {
-          throw new Error(`Erro ao fazer upload do vídeo: ${err.message || "Erro desconhecido"}`);
+          throw new Error(`Error uploading video: ${err.message || "Unknown error"}`);
         }
       }
       
@@ -249,14 +253,14 @@ const TrainingForm = () => {
       if (isEditMode && id) {
         await updateTraining(id, trainingData);
         toast({
-          title: "Treinamento atualizado",
-          description: "O treinamento foi atualizado com sucesso"
+          title: "Training updated",
+          description: "The training was updated successfully"
         });
       } else {
         await createTraining(trainingData);
         toast({
-          title: "Treinamento criado",
-          description: "O treinamento foi criado com sucesso"
+          title: "Training created",
+          description: "The training was created successfully"
         });
       }
       
@@ -265,10 +269,10 @@ const TrainingForm = () => {
       
     } catch (err: any) {
       console.error("Error submitting training:", err);
-      setError(`Erro: ${err.message || "Erro desconhecido"}`);
+      setError(`Error: ${err.message || "Unknown error"}`);
       toast({
-        title: "Erro",
-        description: err.message || "Ocorreu um erro ao salvar o treinamento",
+        title: "Error",
+        description: err.message || "An error occurred while saving the training",
         variant: "destructive"
       });
     } finally {
@@ -283,7 +287,7 @@ const TrainingForm = () => {
         <div className="container mx-auto py-6">
           <div className="flex justify-center py-12">
             <Loader className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Carregando informações da empresa...</p>
+            <p className="ml-2">Loading company information...</p>
           </div>
         </div>
       </Layout>
@@ -291,7 +295,7 @@ const TrainingForm = () => {
   }
   
   const handleRetry = () => {
-    navigate('/dashboard'); // Redireciona para o dashboard
+    navigate('/dashboard'); // Redirect to dashboard
   };
 
   return (
@@ -309,12 +313,12 @@ const TrainingForm = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">
-              {isEditMode ? "Editar Treinamento" : "Novo Treinamento"}
+              {isEditMode ? "Edit Training" : "New Training"}
             </h1>
             <p className="text-muted-foreground">
               {isEditMode 
-                ? "Atualize as informações do treinamento" 
-                : "Crie um novo treinamento para sua equipe"
+                ? "Update the training information" 
+                : "Create a new training for your team"
               }
             </p>
           </div>
@@ -327,11 +331,11 @@ const TrainingForm = () => {
           </div>
         ) : error ? (
           <Alert variant="destructive" className="mb-6">
-            <AlertTitle>Erro</AlertTitle>
+            <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
             <div className="mt-4">
               <Button onClick={handleRetry} variant="outline">
-                Voltar para Dashboard
+                Go back to Dashboard
               </Button>
             </div>
           </Alert>
@@ -341,11 +345,11 @@ const TrainingForm = () => {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Title */}
                 <div className="space-y-2">
-                  <Label htmlFor="title">Título</Label>
+                  <Label htmlFor="title">Title</Label>
                   <Input 
                     id="title"
                     name="title"
-                    placeholder="Título do treinamento" 
+                    placeholder="Training title" 
                     value={formData.title}
                     onChange={handleChange}
                     required
@@ -354,11 +358,11 @@ const TrainingForm = () => {
                 
                 {/* Description */}
                 <div className="space-y-2">
-                  <Label htmlFor="description">Descrição</Label>
+                  <Label htmlFor="description">Description</Label>
                   <Textarea 
                     id="description"
                     name="description"
-                    placeholder="Descreva o treinamento"
+                    placeholder="Describe the training"
                     rows={4}
                     value={formData.description}
                     onChange={handleChange}
@@ -387,7 +391,7 @@ const TrainingForm = () => {
                 {/* YouTube URL or File Upload based on selected type */}
                 {formData.videoType === "YOUTUBE" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="videoUrl">URL do YouTube</Label>
+                    <Label htmlFor="videoUrl">YouTube URL</Label>
                     <Input 
                       id="videoUrl"
                       name="videoUrl"
@@ -397,12 +401,12 @@ const TrainingForm = () => {
                       required={formData.videoType === "YOUTUBE"}
                     />
                     <p className="text-sm text-muted-foreground">
-                      Cole a URL completa do vídeo do YouTube
+                      Paste the complete YouTube video URL
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Label htmlFor="videoFile">Arquivo de vídeo</Label>
+                    <Label htmlFor="videoFile">Video file</Label>
                     <div className="flex items-center space-x-2">
                       <Input 
                         id="videoFile"
@@ -413,12 +417,12 @@ const TrainingForm = () => {
                       />
                       {isEditMode && (
                         <div className="text-sm text-muted-foreground">
-                          {file ? file.name : "Manter vídeo atual"}
+                          {file ? file.name : "Keep current video"}
                         </div>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Formatos aceitos: MP4, WebM. Tamanho máximo: 100MB.
+                      Accepted formats: MP4, WebM. Maximum size: 100MB.
                     </p>
                     
                     {uploadProgress > 0 && (
@@ -434,7 +438,7 @@ const TrainingForm = () => {
                 
                 {/* Duration */}
                 <div className="space-y-2">
-                  <Label htmlFor="durationMin">Duração (minutos)</Label>
+                  <Label htmlFor="durationMin">Duration (minutes)</Label>
                   <Input 
                     id="durationMin"
                     name="durationMin"
@@ -467,7 +471,7 @@ const TrainingForm = () => {
                     <Input 
                       id="tag"
                       name="tag"
-                      placeholder="Adicionar tag" 
+                      placeholder="Add tag" 
                       value={formData.tag}
                       onChange={handleChange}
                       className="flex-1"
@@ -479,14 +483,14 @@ const TrainingForm = () => {
                       onClick={handleAddTag}
                       disabled={!formData.tag.trim()}
                     >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar
+                      <Plus className="h-4 w-4 mr-1" /> Add
                     </Button>
                   </div>
                 </div>
                 
                 {/* Visibility */}
                 <div className="space-y-2">
-                  <Label>Visibilidade</Label>
+                  <Label>Visibility</Label>
                   <RadioGroup 
                     value={formData.visibility}
                     onValueChange={handleVisibilityChange}
@@ -494,11 +498,11 @@ const TrainingForm = () => {
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="PUBLIC" id="visibility-public" />
-                      <Label htmlFor="visibility-public">Público (todos colaboradores)</Label>
+                      <Label htmlFor="visibility-public">Public (all team members)</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="PRIVATE" id="visibility-private" />
-                      <Label htmlFor="visibility-private">Privado (apenas colaboradores selecionados)</Label>
+                      <Label htmlFor="visibility-private">Private (selected team members only)</Label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -507,12 +511,12 @@ const TrainingForm = () => {
                 <div className="flex items-center justify-end gap-2 pt-4">
                   <Link to="/trainings">
                     <Button type="button" variant="outline">
-                      Cancelar
+                      Cancel
                     </Button>
                   </Link>
                   <Button type="submit" disabled={submitting || !companyId}>
                     {submitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                    {isEditMode ? "Salvar alterações" : "Criar treinamento"}
+                    {isEditMode ? "Save changes" : "Create training"}
                   </Button>
                 </div>
               </form>

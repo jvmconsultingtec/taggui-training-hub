@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -35,20 +34,20 @@ const Company = () => {
         setLoading(true);
         setError(null);
         
-        // Obtém o usuário atual
+        // Get current user
         const user = await fetchCurrentUser();
         console.log("User data from fetchCurrentUser:", user);
         
         if (!user) {
-          console.error("Usuário não encontrado");
-          setError("Não foi possível obter informações do usuário. Verifique se você está logado corretamente.");
+          console.error("User not found");
+          setError("Unable to get user information. Please check if you are logged in.");
           setLoading(false);
           return;
         }
         
         if (!user.company_id) {
-          console.error("Usuário sem company_id:", user);
-          setError("Não foi possível obter informações da empresa. Usuário não tem vínculo com empresa.");
+          console.error("User without company_id:", user);
+          setError("Unable to get company information. User is not associated with any company.");
           setLoading(false);
           return;
         }
@@ -56,36 +55,41 @@ const Company = () => {
         const companyId = user.company_id;
         console.log("Using company ID:", companyId);
         
-        // Com o company_id, busca os dados da empresa
-        const { data: companyInfo, error: companyError } = await supabase
-          .from("companies")
-          .select("*")
-          .eq("id", companyId)
-          .maybeSingle();
+        // With company_id, fetch company data
+        try {
+          const { data: companyInfo, error: companyError } = await supabase
+            .from("companies")
+            .select("*")
+            .eq("id", companyId)
+            .maybeSingle();
+            
+          if (companyError) {
+            console.error("Error fetching company data:", companyError);
+            setError("Error fetching company data: " + companyError.message);
+            setLoading(false);
+            return;
+          }
           
-        if (companyError) {
-          console.error("Erro ao buscar dados da empresa:", companyError);
-          setError("Erro ao buscar dados da empresa: " + companyError.message);
+          if (!companyInfo) {
+            console.error("Company not found:", companyId);
+            setError("Company not found. Please check your company ID.");
+            setLoading(false);
+            return;
+          }
+          
+          console.log("Company data:", companyInfo);
+          setCompanyData(companyInfo);
+          if (companyInfo?.name) {
+            setCompanyName(companyInfo.name);
+          }
+        } catch (companyErr) {
+          console.error("Failed to query companies table:", companyErr);
+          setError("Failed to retrieve company data. Please check your permissions.");
           setLoading(false);
-          return;
         }
-        
-        if (!companyInfo) {
-          console.error("Empresa não encontrada:", companyId);
-          setError("Empresa não encontrada. Verifique o ID da empresa.");
-          setLoading(false);
-          return;
-        }
-        
-        console.log("Company data:", companyInfo);
-        setCompanyData(companyInfo);
-        if (companyInfo?.name) {
-          setCompanyName(companyInfo.name);
-        }
-        
       } catch (err: any) {
-        console.error("Erro ao carregar empresa:", err);
-        setError("Ocorreu um erro ao carregar os dados da empresa: " + (err.message || "Erro desconhecido"));
+        console.error("Error loading company:", err);
+        setError("An error occurred while loading company data: " + (err.message || "Unknown error"));
       } finally {
         setLoading(false);
       }
@@ -134,9 +138,9 @@ const Company = () => {
         const { data: buckets } = await supabase.storage.listBuckets();
         console.log("Available buckets:", buckets);
         
-        // Use o bucket training_videos para armazenar também os logos
+        // Use the bucket training_videos for now
         const { error: uploadError } = await supabase.storage
-          .from('training_videos') // We'll reuse the existing bucket for now
+          .from('training_videos')
           .upload(filePath, logoFile);
           
         if (uploadError) {
@@ -189,7 +193,7 @@ const Company = () => {
   };
 
   const handleRetry = () => {
-    navigate('/dashboard'); // Redireciona para o dashboard
+    navigate('/dashboard'); // Redirect to dashboard
   };
 
   return (

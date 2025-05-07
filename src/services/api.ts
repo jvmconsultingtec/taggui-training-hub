@@ -268,7 +268,7 @@ export const fetchCompanyUsers = async () => {
   }
 };
 
-// Function to get the current user's profile with company_id - CORRIGIDA
+// Updated function to get the current user's profile without recursion
 export const fetchCurrentUser = async () => {
   try {
     console.log("Fetching current user data");
@@ -283,8 +283,7 @@ export const fetchCurrentUser = async () => {
     
     console.log("Auth user found:", authUser.id);
     
-    // Busca direta na tabela users usando o ID do usuário autenticado
-    // Isso evita loops infinitos de políticas RLS
+    // Direct query to users table with explicit ID to prevent RLS issues
     const { data: userProfile, error: profileError } = await supabase
       .from("users")
       .select("*")
@@ -292,11 +291,9 @@ export const fetchCurrentUser = async () => {
       .maybeSingle();
     
     if (profileError) {
-      // Em caso de erro, ainda podemos tentar usar os metadados do usuário
-      console.warn("Error fetching user profile:", profileError);
-      console.log("Trying to use auth metadata as fallback");
+      console.error("Error fetching user profile:", profileError);
       
-      // Se os metadados do usuário contiverem company_id, usamos isso como fallback
+      // Fallback to auth metadata if available
       if (authUser.user_metadata?.company_id) {
         return {
           id: authUser.id,
@@ -312,30 +309,35 @@ export const fetchCurrentUser = async () => {
     }
     
     if (!userProfile) {
-      // Se não encontrou o perfil no banco, tenta criar utilizando os metadados
+      // Try to create profile if it doesn't exist
       console.warn("User profile not found in database, attempting to create from metadata");
       
       const companyId = authUser.user_metadata?.company_id || "00000000-0000-0000-0000-000000000000";
       const userName = authUser.user_metadata?.name || authUser.email?.split("@")[0] || "";
       
-      const { data: newProfile, error: insertError } = await supabase
-        .from("users")
-        .insert({
-          id: authUser.id,
-          email: authUser.email || "",
-          name: userName,
-          company_id: companyId
-        })
-        .select()
-        .single();
+      try {
+        const { data: newProfile, error: insertError } = await supabase
+          .from("users")
+          .insert({
+            id: authUser.id,
+            email: authUser.email || "",
+            name: userName,
+            company_id: companyId
+          })
+          .select()
+          .single();
+          
+        if (insertError) {
+          console.error("Error creating user profile:", insertError);
+          return null;
+        }
         
-      if (insertError) {
-        console.error("Error creating user profile:", insertError);
+        console.log("Created new user profile:", newProfile);
+        return newProfile;
+      } catch (error) {
+        console.error("Failed to create user profile:", error);
         return null;
       }
-      
-      console.log("Created new user profile:", newProfile);
-      return newProfile;
     }
     
     console.log("User profile found:", userProfile);

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,19 +24,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     console.log("Setting up auth state listener");
     
-    // Set up auth state listener FIRST (evita problemas de perda de eventos de auth)
+    // Set up auth state listener FIRST (avoid missing auth events)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         console.log("Auth state change:", event, currentSession?.user?.id);
         
-        // Update auth state synchronously (sem chamar outras funções Supabase aqui)
+        // Update auth state synchronously
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_OUT') {
           navigate('/login');
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          // Redirecionar apenas em eventos de login/refresh
           const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
           localStorage.removeItem('returnUrl');
           navigate(returnUrl);
@@ -52,7 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         console.log("Got session:", currentSession?.user?.id || "No session");
         
-        // Atualizar estado apenas se estiver diferente do atual
+        // Update state only if different from current
         if (currentSession?.user?.id !== user?.id) {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
@@ -77,7 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log("Trying to sign in with email:", email);
       
-      // Salva URL atual para redirecionamento após login
+      // Save current URL for redirect after login
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register') {
         localStorage.setItem('returnUrl', currentPath);
@@ -90,7 +88,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
       
-      // Não precisa navegar aqui - o evento onAuthStateChange vai cuidar disso
       toast({
         title: "Login realizado com sucesso",
         description: "Bem-vindo ao TAGGUI Treinamentos"

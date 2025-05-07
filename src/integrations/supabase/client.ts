@@ -17,5 +17,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Vamos remover a inicialização automática do storage bucket para evitar erros de RLS
-// quando o usuário não está autenticado
+// Set storage initialization to be conditional based on authentication
+// to prevent RLS errors when not authenticated
