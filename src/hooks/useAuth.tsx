@@ -24,15 +24,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     console.log("Setting up auth state listener");
-    // Set up auth state listener FIRST
+    
+    // Set up auth state listener FIRST (evita problemas de perda de eventos de auth)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("Auth state change:", event, session?.user?.id);
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, currentSession) => {
+        console.log("Auth state change:", event, currentSession?.user?.id);
+        
+        // Update auth state synchronously (sem chamar outras funções Supabase aqui)
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_OUT') {
           navigate('/login');
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // Redirecionar apenas em eventos de login/refresh
+          const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
+          localStorage.removeItem('returnUrl');
+          navigate(returnUrl);
         }
       }
     );
@@ -41,13 +49,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const getSession = async () => {
       try {
         console.log("Getting existing session");
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-        console.log("Got session:", session?.user?.id);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error retrieving session:', error);
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        console.log("Got session:", currentSession?.user?.id || "No session");
+        
+        // Atualizar estado apenas se estiver diferente do atual
+        if (currentSession?.user?.id !== user?.id) {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+        }
+      } catch (err) {
+        console.error('Error retrieving session:', err);
+      } finally {
         setLoading(false);
       }
     };
@@ -58,18 +70,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("Unsubscribing from auth state changes");
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, user?.id]);
 
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      console.log("Trying to sign in with email:", email);
+      
+      // Salva URL atual para redirecionamento após login
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register') {
+        localStorage.setItem('returnUrl', currentPath);
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
+        console.error("Sign in error:", error.message);
         throw error;
       }
       
-      navigate('/dashboard');
+      // Não precisa navegar aqui - o evento onAuthStateChange vai cuidar disso
       toast({
         title: "Login realizado com sucesso",
         description: "Bem-vindo ao TAGGUI Treinamentos"
@@ -88,6 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (email: string, password: string, name: string) => {
     try {
       setLoading(true);
+      console.log("Trying to sign up user:", email, name);
       
       // Usar a empresa padrão que criamos no banco de dados
       const companyId = "00000000-0000-0000-0000-000000000000";
@@ -104,6 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       if (error) {
+        console.error("Sign up error:", error.message);
         throw error;
       }
 
@@ -130,7 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
-      navigate('/login');
+      // O redirecionamento será feito pelo listener onAuthStateChange
     } catch (error: any) {
       toast({
         title: "Erro ao sair",

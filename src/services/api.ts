@@ -268,41 +268,80 @@ export const fetchCompanyUsers = async () => {
   }
 };
 
-// Function to get the current user's profile with company_id
+// Function to get the current user's profile with company_id - CORRIGIDA
 export const fetchCurrentUser = async () => {
   try {
-    console.log("Fetching current user");
-    // First get the authenticated user
-    const { data: { user } } = await supabase.auth.getUser();
+    console.log("Fetching current user data");
     
-    if (!user) {
+    // First get the authenticated user from auth
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    
+    if (!authUser) {
       console.log("No authenticated user found");
       return null;
     }
     
-    console.log("User from auth:", user);
+    console.log("Auth user found:", authUser.id);
     
-    // Directly query the users table for the complete profile
+    // Busca direta na tabela users usando o ID do usuário autenticado
+    // Isso evita loops infinitos de políticas RLS
     const { data: userProfile, error: profileError } = await supabase
       .from("users")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", authUser.id)
       .maybeSingle();
     
     if (profileError) {
-      console.error("Error fetching user profile:", profileError);
-      throw profileError;
-    }
-    
-    if (!userProfile) {
-      console.error("User profile not found in database");
+      // Em caso de erro, ainda podemos tentar usar os metadados do usuário
+      console.warn("Error fetching user profile:", profileError);
+      console.log("Trying to use auth metadata as fallback");
+      
+      // Se os metadados do usuário contiverem company_id, usamos isso como fallback
+      if (authUser.user_metadata?.company_id) {
+        return {
+          id: authUser.id,
+          email: authUser.email || "",
+          name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "",
+          company_id: authUser.user_metadata.company_id,
+          role: authUser.user_metadata?.role || "COLLABORATOR",
+          created_at: authUser.created_at
+        };
+      }
+      
       return null;
     }
     
-    console.log("User profile from database:", userProfile);
+    if (!userProfile) {
+      // Se não encontrou o perfil no banco, tenta criar utilizando os metadados
+      console.warn("User profile not found in database, attempting to create from metadata");
+      
+      const companyId = authUser.user_metadata?.company_id || "00000000-0000-0000-0000-000000000000";
+      const userName = authUser.user_metadata?.name || authUser.email?.split("@")[0] || "";
+      
+      const { data: newProfile, error: insertError } = await supabase
+        .from("users")
+        .insert({
+          id: authUser.id,
+          email: authUser.email || "",
+          name: userName,
+          company_id: companyId
+        })
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error("Error creating user profile:", insertError);
+        return null;
+      }
+      
+      console.log("Created new user profile:", newProfile);
+      return newProfile;
+    }
+    
+    console.log("User profile found:", userProfile);
     return userProfile;
   } catch (error) {
-    console.error("Error fetching current user:", error);
+    console.error("Error in fetchCurrentUser:", error);
     return null;
   }
 };

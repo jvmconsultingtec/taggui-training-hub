@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface CompanyData {
 }
 
 const Company = () => {
+  const navigate = useNavigate();
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,55 +35,58 @@ const Company = () => {
         setLoading(true);
         setError(null);
         
-        // Primeiro obtém o usuário atual
+        // Obtém o usuário atual
         const user = await fetchCurrentUser();
         console.log("User data from fetchCurrentUser:", user);
         
-        if (!user || !user.company_id) {
-          console.error("Usuário sem company_id ou não encontrado:", user);
+        if (!user) {
+          console.error("Usuário não encontrado");
+          setError("Não foi possível obter informações do usuário. Verifique se você está logado corretamente.");
+          setLoading(false);
+          return;
+        }
+        
+        if (!user.company_id) {
+          console.error("Usuário sem company_id:", user);
           setError("Não foi possível obter informações da empresa. Usuário não tem vínculo com empresa.");
           setLoading(false);
           return;
         }
         
-        // Obtém o company_id usando a função RPC em vez de acessar diretamente
-        const { data: companyId, error: rpcError } = await supabase.rpc('get_user_company_id', {
-          user_id: user.id
-        });
-        
-        if (rpcError) {
-          console.error("Erro ao buscar company_id via RPC:", rpcError);
-          setError("Erro ao buscar ID da empresa: " + rpcError.message);
-          setLoading(false);
-          return;
-        }
-        
-        console.log("Company ID from RPC:", companyId);
+        const companyId = user.company_id;
+        console.log("Using company ID:", companyId);
         
         // Com o company_id, busca os dados da empresa
-        const { data, error } = await supabase
+        const { data: companyInfo, error: companyError } = await supabase
           .from("companies")
           .select("*")
-          .eq("id", companyId || user.company_id)
-          .single();
+          .eq("id", companyId)
+          .maybeSingle();
           
-        if (error) {
-          console.error("Erro ao buscar dados da empresa:", error);
-          setError("Erro ao buscar dados da empresa: " + error.message);
+        if (companyError) {
+          console.error("Erro ao buscar dados da empresa:", companyError);
+          setError("Erro ao buscar dados da empresa: " + companyError.message);
           setLoading(false);
           return;
         }
         
-        console.log("Company data:", data);
-        setCompanyData(data);
-        if (data?.name) {
-          setCompanyName(data.name);
+        if (!companyInfo) {
+          console.error("Empresa não encontrada:", companyId);
+          setError("Empresa não encontrada. Verifique o ID da empresa.");
+          setLoading(false);
+          return;
         }
         
-        setLoading(false);
+        console.log("Company data:", companyInfo);
+        setCompanyData(companyInfo);
+        if (companyInfo?.name) {
+          setCompanyName(companyInfo.name);
+        }
+        
       } catch (err: any) {
         console.error("Erro ao carregar empresa:", err);
-        setError("Ocorreu um erro ao carregar os dados da empresa: " + err.message);
+        setError("Ocorreu um erro ao carregar os dados da empresa: " + (err.message || "Erro desconhecido"));
+      } finally {
         setLoading(false);
       }
     };
@@ -126,11 +131,16 @@ const Company = () => {
         const fileName = `company_logo_${companyData.id}_${Date.now()}.${fileExt}`;
         const filePath = `logos/${fileName}`;
         
+        const { data: buckets } = await supabase.storage.listBuckets();
+        console.log("Available buckets:", buckets);
+        
+        // Use o bucket training_videos para armazenar também os logos
         const { error: uploadError } = await supabase.storage
           .from('training_videos') // We'll reuse the existing bucket for now
           .upload(filePath, logoFile);
           
         if (uploadError) {
+          console.error("Error uploading logo:", uploadError);
           throw uploadError;
         }
         
@@ -178,6 +188,10 @@ const Company = () => {
     }
   };
 
+  const handleRetry = () => {
+    navigate('/dashboard'); // Redireciona para o dashboard
+  };
+
   return (
     <Layout>
       <div className="container mx-auto py-6">
@@ -191,10 +205,15 @@ const Company = () => {
             <Loader className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Erro</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+            <div className="mt-4">
+              <Button onClick={handleRetry} variant="outline">
+                Voltar para Dashboard
+              </Button>
+            </div>
           </Alert>
         ) : (
           <div className="grid gap-6">

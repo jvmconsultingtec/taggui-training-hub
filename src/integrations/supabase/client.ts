@@ -17,37 +17,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Initialize storage bucket for training videos if it doesn't exist
-async function initStorage() {
-  try {
-    // Check for bucket existence through JavaScript SDK
-    const { data: buckets } = await supabase.storage.listBuckets();
-    
-    // Look for the training_videos bucket
-    if (!buckets || !buckets.find(bucket => bucket.name === 'training_videos')) {
-      console.log("Training videos bucket not found. Creating it now...");
-      
-      // Create the bucket with a smaller file size limit to avoid 413 errors
-      const { data, error } = await supabase.storage
-        .createBucket('training_videos', {
-          public: true, // Make files publicly accessible
-          fileSizeLimit: 1024 * 1024 * 50, // 50MB file size limit (reduced from 100MB)
-        });
-      
-      if (error) {
-        console.error("Error creating training_videos bucket:", error);
-      } else {
-        console.log("Created training_videos bucket successfully:", data);
-      }
-    } else {
-      console.log("Training videos bucket already exists");
-    }
-  } catch (error) {
-    console.error("Error checking/creating storage buckets:", error);
-  }
-}
-
-// Initialize storage when the client is imported
-if (typeof window !== 'undefined') {
-  initStorage();
-}
+// Vamos remover a inicialização automática do storage bucket para evitar erros de RLS
+// quando o usuário não está autenticado

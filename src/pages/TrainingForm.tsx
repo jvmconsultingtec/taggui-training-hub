@@ -60,26 +60,44 @@ const TrainingForm = () => {
         setError(null);
         console.log("Fetching company ID...");
         
-        const currentUser = await fetchCurrentUser();
-        console.log("Current user data:", currentUser);
-        
-        if (currentUser && currentUser.company_id) {
-          console.log("Company ID found:", currentUser.company_id);
-          setCompanyId(currentUser.company_id);
-        } else {
-          console.error("No company ID found in user data");
-          setError("Não foi possível obter o ID da empresa. Verifique se você está logado corretamente.");
+        // Primeiro verificamos se o usuário está autenticado
+        if (!user) {
+          console.error("User not authenticated");
+          setError("Usuário não autenticado. Por favor, faça login novamente.");
+          setFetchingCompanyId(false);
+          return;
         }
-      } catch (err) {
+        
+        // Buscamos as informações do usuário com a função corrigida
+        const currentUser = await fetchCurrentUser();
+        console.log("Current user data from fetchCurrentUser:", currentUser);
+        
+        if (!currentUser) {
+          console.error("User not found in database");
+          setError("Não foi possível obter os dados do usuário. Verifique se você está logado corretamente.");
+          setFetchingCompanyId(false);
+          return;
+        }
+        
+        if (!currentUser.company_id) {
+          console.error("No company ID found in user data");
+          setError("Não foi possível obter o ID da empresa. O usuário não tem vínculo com nenhuma empresa.");
+          setFetchingCompanyId(false);
+          return;
+        }
+        
+        console.log("Company ID found:", currentUser.company_id);
+        setCompanyId(currentUser.company_id);
+        setFetchingCompanyId(false);
+      } catch (err: any) {
         console.error("Error fetching company ID:", err);
-        setError("Erro ao obter o ID da empresa. Por favor, tente novamente mais tarde.");
-      } finally {
+        setError("Erro ao obter o ID da empresa: " + (err.message || "Erro desconhecido"));
         setFetchingCompanyId(false);
       }
     };
     
     getCompanyId();
-  }, []);
+  }, [user]);
   
   // Fetch training if in edit mode
   useEffect(() => {
@@ -170,11 +188,11 @@ const TrainingForm = () => {
       setUploadProgress(0);
       
       if (!user) {
-        throw new Error("Usuário não autenticado");
+        throw new Error("Usuário não autenticado. Por favor, faça login novamente.");
       }
       
       if (!companyId) {
-        throw new Error("ID da empresa não disponível");
+        throw new Error("ID da empresa não disponível. Verifique seu vínculo com uma empresa.");
       }
       
       // Validate form
@@ -271,6 +289,10 @@ const TrainingForm = () => {
       </Layout>
     );
   }
+  
+  const handleRetry = () => {
+    navigate('/dashboard'); // Redireciona para o dashboard
+  };
 
   return (
     <Layout>
@@ -303,10 +325,15 @@ const TrainingForm = () => {
           <div className="flex justify-center py-12">
             <Loader className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : error && !submitting ? (
+        ) : error ? (
           <Alert variant="destructive" className="mb-6">
             <AlertTitle>Erro</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+            <div className="mt-4">
+              <Button onClick={handleRetry} variant="outline">
+                Voltar para Dashboard
+              </Button>
+            </div>
           </Alert>
         ) : (
           <Card>
