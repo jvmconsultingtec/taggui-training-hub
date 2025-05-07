@@ -1,207 +1,174 @@
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronLeft, Calendar, Clock, Tag, Check } from "lucide-react";
-import VideoPlayer from "../components/trainings/VideoPlayer";
-import Layout from "../components/layout/Layout";
-import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { fetchTrainingById, updateTrainingProgress } from "@/services/api";
+import { Layout } from "@/components/layout/Layout";
+import { VideoPlayer } from "@/components/trainings/VideoPlayer";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Clock, Bookmark, Tag, Check } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
-// Mock training data
-const mockTrainingDetails = {
-  id: "2",
-  title: "Segurança da Informação",
-  description: "Aprenda as melhores práticas para proteger dados sensíveis da empresa e dos clientes. Este treinamento cobre os fundamentos de segurança digital, prevenção contra phishing, gerenciamento seguro de senhas e muito mais.",
-  videoType: "YOUTUBE" as const,
-  videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", // Example YouTube URL
-  durationMin: 25,
-  tags: ["Segurança", "TI", "Obrigatório"],
-  createdAt: "2025-04-15T10:30:00Z",
-  progress: 45,
-  instructor: "Carlos Silva",
-  instructorRole: "Diretor de TI"
+type Training = {
+  id: string;
+  title: string;
+  description: string | null;
+  duration_min: number;
+  video_type: "UPLOAD" | "YOUTUBE";
+  video_url: string;
+  tags: string[] | null;
 };
 
 const TrainingDetail = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [training, setTraining] = useState(mockTrainingDetails);
-  const [progress, setProgress] = useState(training.progress);
-  const [isCompleted, setIsCompleted] = useState(progress === 100);
-  const [isCompletionLoading, setIsCompletionLoading] = useState(false);
-  
+  const { user } = useAuth();
+  const [training, setTraining] = useState<Training | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [completed, setCompleted] = useState(false);
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
-    // In a real app, you'd fetch the training details by ID
-    // For now, we'll just use the mock data
-    console.log(`Fetching training with ID: ${id}`);
+    const loadTraining = async () => {
+      if (!id || !user) return;
+      
+      try {
+        setLoading(true);
+        const data = await fetchTrainingById(id);
+        setTraining(data);
+        
+        // Here you would load progress data from training_progress table
+      } catch (error) {
+        console.error("Error loading training:", error);
+        toast({
+          title: "Erro ao carregar treinamento",
+          description: "Não foi possível carregar os detalhes do treinamento",
+          variant: "destructive"
+        });
+        navigate("/dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTraining();
+  }, [id, user, navigate]);
+
+  const handleProgressUpdate = async (progressPercent: number) => {
+    if (!training || !user) return;
     
-    // For demonstration purposes, let's pretend we're loading data
-    // In a real app, you'd make an API call here
-  }, [id]);
-  
-  const handleProgressUpdate = (newProgress: number) => {
-    setProgress(newProgress);
-    
-    // In a real app, you'd save this progress to the backend
-    console.log(`Updating progress to ${newProgress}%`);
-    
-    // Mark as completed if reached 100%
-    if (newProgress >= 100 && !isCompleted) {
-      setIsCompleted(true);
+    try {
+      setProgress(progressPercent);
+      await updateTrainingProgress(training.id, user.id, progressPercent);
+    } catch (error) {
+      console.error("Error updating progress:", error);
     }
   };
-  
-  const handleMarkAsCompleted = () => {
-    setIsCompletionLoading(true);
+
+  const handleComplete = async () => {
+    if (!training || !user) return;
     
-    // Simulate API call to mark the training as completed
-    setTimeout(() => {
+    try {
+      await updateTrainingProgress(training.id, user.id, 100, true);
+      setCompleted(true);
       setProgress(100);
-      setIsCompleted(true);
-      setIsCompletionLoading(false);
-      toast.success("Treinamento marcado como concluído!");
-    }, 1000);
+      
+      toast({
+        title: "Treinamento completado",
+        description: "Parabéns por completar este treinamento!",
+      });
+    } catch (error) {
+      console.error("Error completing training:", error);
+      toast({
+        title: "Erro ao completar treinamento",
+        description: "Não foi possível marcar o treinamento como concluído",
+        variant: "destructive"
+      });
+    }
   };
-  
-  // Format the creation date
-  const formattedDate = new Date(training.createdAt).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-  
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container mx-auto py-6">
+          <div className="text-center">Carregando treinamento...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!training) {
+    return (
+      <Layout>
+        <div className="container mx-auto py-6">
+          <div className="text-center">Treinamento não encontrado</div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto">
-        {/* Back button */}
-        <button 
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-gray-600 hover:text-taggui-primary mb-6"
-        >
-          <ChevronLeft size={18} />
-          <span>Voltar</span>
-        </button>
-        
-        {/* Training header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{training.title}</h1>
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+            <h1 className="text-2xl font-bold">{training.title}</h1>
+            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
-                <Calendar size={16} />
-                <span>{formattedDate}</span>
+                <Clock className="h-4 w-4" />
+                <span>{training.duration_min} minutos</span>
               </div>
-              <div className="flex items-center gap-1">
-                <Clock size={16} />
-                <span>{training.durationMin} minutos</span>
-              </div>
+              {completed ? (
+                <div className="flex items-center gap-1 text-green-600">
+                  <Check className="h-4 w-4" />
+                  <span>Concluído</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Bookmark className="h-4 w-4" />
+                  <span>{progress}% completo</span>
+                </div>
+              )}
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            {!isCompleted ? (
-              <button 
-                onClick={handleMarkAsCompleted}
-                disabled={isCompletionLoading}
-                className="taggui-btn-primary flex items-center gap-2"
-              >
-                <Check size={18} />
-                {isCompletionLoading ? "Processando..." : "Marcar como concluído"}
-              </button>
+          <Button 
+            onClick={handleComplete} 
+            disabled={completed || progress < 90}
+            className="bg-taggui-primary hover:bg-taggui-primary-hover"
+          >
+            {completed ? "Concluído" : "Marcar como Concluído"}
+          </Button>
+        </div>
+
+        <VideoPlayer 
+          videoType={training.video_type} 
+          videoUrl={training.video_url}
+          onProgressUpdate={handleProgressUpdate}
+        />
+
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Sobre este treinamento</h2>
+          <Separator />
+          <div className="prose max-w-none">
+            {training.description ? (
+              <p>{training.description}</p>
             ) : (
-              <div className="status-badge completed flex items-center gap-2 px-3 py-2">
-                <Check size={18} />
-                <span>Concluído</span>
-              </div>
+              <p className="text-muted-foreground">Nenhuma descrição disponível.</p>
             )}
           </div>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main content with video */}
-          <div className="lg:col-span-2">
-            <div className="taggui-card mb-6">
-              <VideoPlayer 
-                videoUrl={training.videoUrl}
-                videoType={training.videoType}
-                onProgress={handleProgressUpdate}
-                initialProgress={progress}
-              />
-              
-              {/* Progress bar */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-gray-600">Seu progresso</span>
-                  <span className="font-medium">{Math.round(progress)}%</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-taggui-primary transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Description section */}
-            <div className="taggui-card">
-              <h2 className="text-lg font-semibold mb-3">Descrição</h2>
-              <p className="text-gray-700 whitespace-pre-line">{training.description}</p>
-              
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2 mt-6">
+
+          {training.tags && training.tags.length > 0 && (
+            <div className="pt-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Tag className="h-4 w-4 text-muted-foreground" />
                 {training.tags.map((tag, index) => (
-                  <span 
-                    key={index}
-                    className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full text-xs font-medium text-gray-600"
-                  >
-                    <Tag size={12} />
+                  <div key={index} className="bg-taggui-primary-light text-taggui-primary px-2 py-1 rounded text-xs">
                     {tag}
-                  </span>
+                  </div>
                 ))}
               </div>
             </div>
-          </div>
-          
-          {/* Sidebar with instructor and additional info */}
-          <div className="space-y-6">
-            {/* Instructor card */}
-            <div className="taggui-card">
-              <h2 className="text-lg font-semibold mb-4">Instrutor</h2>
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-medium">
-                  {training.instructor.split(' ').map(n => n[0]).join('')}
-                </div>
-                <div>
-                  <p className="font-medium">{training.instructor}</p>
-                  <p className="text-sm text-gray-600">{training.instructorRole}</p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Related trainings card - would be dynamic in a real app */}
-            <div className="taggui-card">
-              <h2 className="text-lg font-semibold mb-4">Treinamentos relacionados</h2>
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden flex-shrink-0"></div>
-                  <div>
-                    <p className="font-medium text-sm">Proteção de Dados e LGPD</p>
-                    <p className="text-xs text-gray-600">18 minutos</p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <div className="h-16 w-24 bg-gray-200 rounded overflow-hidden flex-shrink-0"></div>
-                  <div>
-                    <p className="font-medium text-sm">Cibersegurança Básica</p>
-                    <p className="text-xs text-gray-600">22 minutos</p>
-                  </div>
-                </div>
-              </div>
-              <button className="taggui-btn-outline w-full mt-4">
-                Ver mais treinamentos
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </Layout>

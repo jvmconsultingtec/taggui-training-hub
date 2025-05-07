@@ -9,7 +9,190 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      companies: {
+        Row: {
+          created_at: string | null
+          id: string
+          logo_url: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      training_assignments: {
+        Row: {
+          assigned_at: string | null
+          id: string
+          training_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          id?: string
+          training_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          id?: string
+          training_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_assignments_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_progress: {
+        Row: {
+          completed_at: string | null
+          id: string
+          last_viewed_at: string
+          progress_pct: number
+          training_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          last_viewed_at?: string
+          progress_pct?: number
+          training_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          last_viewed_at?: string
+          progress_pct?: number
+          training_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_progress_training_id_fkey"
+            columns: ["training_id"]
+            isOneToOne: false
+            referencedRelation: "trainings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trainings: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          description: string | null
+          duration_min: number
+          id: string
+          tags: string[] | null
+          title: string
+          video_type: Database["public"]["Enums"]["video_type"]
+          video_url: string
+          visibility: Database["public"]["Enums"]["visibility"] | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          duration_min: number
+          id?: string
+          tags?: string[] | null
+          title: string
+          video_type: Database["public"]["Enums"]["video_type"]
+          video_url: string
+          visibility?: Database["public"]["Enums"]["visibility"] | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          duration_min?: number
+          id?: string
+          tags?: string[] | null
+          title?: string
+          video_type?: Database["public"]["Enums"]["video_type"]
+          video_url?: string
+          visibility?: Database["public"]["Enums"]["visibility"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          email: string
+          id: string
+          linkedin_id: string | null
+          name: string
+          role: Database["public"]["Enums"]["user_role"] | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          email: string
+          id: string
+          linkedin_id?: string | null
+          name: string
+          role?: Database["public"]["Enums"]["user_role"] | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          linkedin_id?: string | null
+          name?: string
+          role?: Database["public"]["Enums"]["user_role"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -25,13 +208,23 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_current_user_company_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       promover_a_admin: {
         Args: { email_usuario: string }
         Returns: string
       }
+      user_belongs_to_company: {
+        Args: { user_id: string; company_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_role: "ADMIN" | "MANAGER" | "COLLABORATOR"
+      video_type: "UPLOAD" | "YOUTUBE"
+      visibility: "PUBLIC" | "PRIVATE"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -146,6 +339,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["ADMIN", "MANAGER", "COLLABORATOR"],
+      video_type: ["UPLOAD", "YOUTUBE"],
+      visibility: ["PUBLIC", "PRIVATE"],
+    },
   },
 } as const
