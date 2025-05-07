@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -281,19 +282,38 @@ export const fetchCurrentUser = async () => {
     
     console.log("User from auth:", user);
     
-    const { data, error } = await supabase
+    // Use RPC (Remote Procedure Call) para chamar a função SQL segura
+    // Isso evita o problema de recursão infinita
+    const { data: userData, error } = await supabase.rpc('get_user_company_id', {
+      user_id: user.id
+    });
+    
+    if (error) {
+      console.error("Erro ao buscar company_id do usuário:", error);
+      return null;
+    }
+    
+    console.log("User company_id from rpc:", userData);
+    
+    // Agora buscamos o perfil completo do usuário
+    const { data: userProfile, error: profileError } = await supabase
       .from("users")
       .select("*")
       .eq("id", user.id)
       .maybeSingle();
     
-    if (error) {
-      console.error("Erro ao buscar perfil do usuário:", error);
+    if (profileError) {
+      console.error("Erro ao buscar perfil do usuário:", profileError);
       return null;
     }
     
-    console.log("Current user profile fetched:", data);
-    return data;
+    // Garantimos que o company_id esteja presente
+    if (userProfile && !userProfile.company_id && userData) {
+      userProfile.company_id = userData;
+    }
+    
+    console.log("Current user profile fetched:", userProfile);
+    return userProfile;
   } catch (error) {
     console.error("Erro ao buscar usuário atual:", error);
     return null;

@@ -28,10 +28,11 @@ async function initStorage() {
       console.log("Training videos bucket not found. Creating it now...");
       
       // Create the bucket
-      const { data, error } = await supabase.storage.createBucket('training_videos', {
-        public: true, // Make files publicly accessible
-        fileSizeLimit: 1024 * 1024 * 100, // 100MB file size limit
-      });
+      const { data, error } = await supabase.storage
+        .createBucket('training_videos', {
+          public: true, // Make files publicly accessible
+          fileSizeLimit: 1024 * 1024 * 100, // 100MB file size limit
+        });
       
       if (error) {
         console.error("Error creating training_videos bucket:", error);

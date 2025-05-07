@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { fetchCurrentUser } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
@@ -34,38 +33,55 @@ const Company = () => {
         setLoading(true);
         setError(null);
         
-        // First get the current user
+        // Primeiro obtém o usuário atual
         const user = await fetchCurrentUser();
+        console.log("User data from fetchCurrentUser:", user);
         
         if (!user || !user.company_id) {
-          setError("Não foi possível obter informações da empresa.");
+          console.error("Usuário sem company_id ou não encontrado:", user);
+          setError("Não foi possível obter informações da empresa. Usuário não tem vínculo com empresa.");
           setLoading(false);
           return;
         }
         
-        // Then fetch the company information
+        // Obtém o company_id usando a função RPC em vez de acessar diretamente
+        const { data: companyId, error: rpcError } = await supabase.rpc('get_user_company_id', {
+          user_id: user.id
+        });
+        
+        if (rpcError) {
+          console.error("Erro ao buscar company_id via RPC:", rpcError);
+          setError("Erro ao buscar ID da empresa: " + rpcError.message);
+          setLoading(false);
+          return;
+        }
+        
+        console.log("Company ID from RPC:", companyId);
+        
+        // Com o company_id, busca os dados da empresa
         const { data, error } = await supabase
           .from("companies")
           .select("*")
-          .eq("id", user.company_id)
+          .eq("id", companyId || user.company_id)
           .single();
           
         if (error) {
           console.error("Erro ao buscar dados da empresa:", error);
-          setError("Erro ao buscar dados da empresa.");
+          setError("Erro ao buscar dados da empresa: " + error.message);
           setLoading(false);
           return;
         }
         
+        console.log("Company data:", data);
         setCompanyData(data);
         if (data?.name) {
           setCompanyName(data.name);
         }
         
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Erro ao carregar empresa:", err);
-        setError("Ocorreu um erro ao carregar os dados da empresa.");
+        setError("Ocorreu um erro ao carregar os dados da empresa: " + err.message);
         setLoading(false);
       }
     };
@@ -90,7 +106,14 @@ const Company = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!companyData) return;
+    if (!companyData) {
+      toast({
+        title: "Erro",
+        description: "Dados da empresa não encontrados",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setSubmitting(true);
