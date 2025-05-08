@@ -1,5 +1,4 @@
 
-
 -- Create a stored procedure to fetch users without recursion
 CREATE OR REPLACE FUNCTION public.fetch_company_users()
 RETURNS SETOF public.users

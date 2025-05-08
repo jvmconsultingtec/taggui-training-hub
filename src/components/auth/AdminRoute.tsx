@@ -22,7 +22,10 @@ export const AdminRoute = () => {
         // Use the security definer function to check admin status
         const { data: isAdminResult, error } = await supabase.rpc('is_admin');
         
-        if (error) throw error;
+        if (error) {
+          console.error("Error checking admin status:", error);
+          throw error;
+        }
         
         console.log("AdminRoute - Is user admin?", isAdminResult);
         setIsAdmin(isAdminResult);

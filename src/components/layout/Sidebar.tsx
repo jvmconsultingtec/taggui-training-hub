@@ -76,6 +76,13 @@ const Sidebar = () => {
     checkAdminStatus();
   }, [user, authIsAdmin]);
   
+  // Force check if admin status changes
+  useEffect(() => {
+    setIsAdmin(authIsAdmin);
+  }, [authIsAdmin]);
+
+  console.log("Sidebar rendering - isAdmin:", isAdmin, "authIsAdmin:", authIsAdmin);
+  
   return (
     <div 
       className={`h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-200 ease-in-out ${
