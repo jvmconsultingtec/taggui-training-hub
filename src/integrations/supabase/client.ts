@@ -14,14 +14,18 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Add this helper to determine if the user is authenticated
+// Helper to determine if the user is authenticated
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.auth.getSession();
-    if (error || !data.session) return false;
-    return true;
+    if (error) {
+      console.error("Error checking authentication:", error);
+      return false;
+    }
+    
+    return !!data.session;
   } catch (error) {
-    console.error("Error checking authentication:", error);
+    console.error("Exception checking authentication:", error);
     return false;
   }
 };

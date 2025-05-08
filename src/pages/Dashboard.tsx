@@ -36,31 +36,47 @@ const Dashboard = () => {
       if (!user) return;
       
       try {
+        console.log("Loading user profile for:", user.id);
         const profile = await fetchCurrentUser();
-        setUserProfile(profile);
+        
+        if (profile) {
+          console.log("User profile loaded:", profile.name);
+          setUserProfile(profile);
+        } else {
+          console.warn("Could not load user profile");
+        }
       } catch (err) {
-        console.error("Erro ao carregar perfil do usuário:", err);
+        console.error("Error loading user profile:", err);
       }
     };
 
-    loadUserProfile();
+    if (user) {
+      loadUserProfile();
+    }
   }, [user]);
 
   useEffect(() => {
     const loadTrainings = async () => {
-      if (!user || !session) return;
+      if (!user || !session) {
+        console.log("No user or session, skipping training load");
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
         setError(null);
         
         console.log("Loading trainings for user:", user.id);
-        console.log("Session expires at:", new Date(session.expires_at * 1000).toLocaleString());
+        if (session.expires_at) {
+          console.log("Session expires at:", new Date(session.expires_at * 1000).toLocaleString());
+        }
         
         const data = await fetchAssignedTrainings(user.id);
+        console.log("Trainings loaded:", data.length);
         setTrainings(data);
       } catch (err: any) {
-        console.error("Erro ao carregar treinamentos:", err);
+        console.error("Error loading trainings:", err);
         setError("Não foi possível carregar os treinamentos. Por favor, tente novamente mais tarde.");
       } finally {
         setLoading(false);

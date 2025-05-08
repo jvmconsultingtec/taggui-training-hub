@@ -46,12 +46,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check if session is expired
-  const isSessionExpired = new Date(session.expires_at! * 1000) < new Date();
-  if (isSessionExpired) {
-    console.log("Session expired, redirecting to login");
-    // Save the current location for redirect after login
-    localStorage.setItem('returnUrl', window.location.pathname);
-    return <Navigate to={redirectTo} replace />;
+  if (session.expires_at) {
+    const isSessionExpired = new Date(session.expires_at * 1000) < new Date();
+    if (isSessionExpired) {
+      console.log("Session expired, redirecting to login");
+      // Save the current location for redirect after login
+      localStorage.setItem('returnUrl', window.location.pathname);
+      return <Navigate to={redirectTo} replace />;
+    }
   }
 
   // Display children only if user is authenticated

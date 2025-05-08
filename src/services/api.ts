@@ -11,19 +11,33 @@ type Visibility = Database["public"]["Enums"]["visibility"];
 
 // Helper function to verify authentication
 const checkAuth = async () => {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session) {
-    console.error("Auth check failed:", error || "No session found");
+  const { data, error } = await supabase.auth.getSession();
+  
+  if (error) {
+    console.error("Auth check failed:", error);
     throw new Error("Authentication required");
   }
   
-  console.log("Auth check passed, user:", session.user.id);
-  return session;
+  if (!data.session) {
+    console.error("No session found");
+    throw new Error("Authentication required");
+  }
+  
+  console.log("Auth check passed, user:", data.session.user.id);
+  return data.session;
 };
 
 // Helper function for basic error handling
 const handleError = (error: any, message: string) => {
   console.error(`${message} Details:`, error);
+  
+  // Show toast with error message
+  toast({
+    title: "Erro",
+    description: error instanceof Error ? error.message : "Ocorreu um erro inesperado",
+    variant: "destructive"
+  });
+  
   throw error;
 };
 
@@ -33,14 +47,14 @@ export const fetchCurrentUser = async () => {
     console.log("Fetching current user data");
     
     // Get the current authenticated user from auth
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
     
-    if (authError || !session) {
-      console.error("No authenticated session:", authError);
+    if (error) {
+      console.error("No authenticated session:", error);
       return null;
     }
     
-    const { user: authUser } = session;
+    const authUser = data.session?.user;
     if (!authUser) {
       console.log("No authenticated user found in session");
       return null;
@@ -53,7 +67,7 @@ export const fetchCurrentUser = async () => {
       .from("users")
       .select("*")
       .eq("id", authUser.id)
-      .single();
+      .maybeSingle();
     
     if (profileError) {
       console.error("Error fetching user profile:", profileError);
@@ -86,10 +100,14 @@ export const fetchCompanyUsers = async () => {
       .select("*")
       .order("name");
     
-    if (error) throw error;
+    if (error) {
+      handleError(error, "Error fetching company users:");
+      return [];
+    }
+    
     return data || [];
   } catch (error) {
-    handleError(error, "Error fetching company users:");
+    console.error("Error in fetchCompanyUsers:", error);
     return [];
   }
 };

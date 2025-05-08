@@ -25,20 +25,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session and set up auth listener
     const initializeAuth = async () => {
       try {
         setLoading(true);
-        
         console.log("Initializing auth state");
         
         // Set up auth state listener FIRST to prevent missing auth events
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          (event, sessionData) => {
-            console.log("Auth state change:", event, sessionData?.user?.id);
+          (event, currentSession) => {
+            console.log("Auth state change:", event, currentSession?.user?.id);
             
-            setUser(sessionData?.user ?? null);
-            setSession(sessionData);
+            setUser(currentSession?.user ?? null);
+            setSession(currentSession);
             
             if (event === 'SIGNED_OUT') {
               console.log("User signed out, navigating to login");
@@ -53,12 +51,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         );
         
         // THEN check for existing session
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
         
-        if (currentSession) {
-          console.log("Active session found for user:", currentSession.user.id);
-          setUser(currentSession.user);
-          setSession(currentSession);
+        if (error) {
+          console.error("Error getting session:", error);
+        } else if (data.session) {
+          console.log("Active session found for user:", data.session.user.id);
+          setUser(data.session.user);
+          setSession(data.session);
         } else {
           console.log("No active session found");
         }
@@ -91,7 +91,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error("Sign in error:", error);
-        throw error;
+        toast({
+          title: "Erro no login",
+          description: error.message || "Verifique suas credenciais",
+          variant: "destructive"
+        });
+        return;
       }
       
       if (data?.user) {
@@ -103,19 +108,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .from("users")
             .select("id")
             .eq("id", data.user.id)
-            .single();
+            .maybeSingle();
             
-          if (userCheckError && userCheckError.code === "PGRST116") {
+          if (userCheckError) {
+            console.error("Error checking user profile:", userCheckError);
+          } else if (!userExists) {
             // User doesn't exist, create user profile
-            await supabase.from("users").insert({
+            const { error: createError } = await supabase.from("users").insert({
               id: data.user.id,
               email: data.user.email || "",
               name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "User",
-              company_id: "00000000-0000-0000-0000-000000000000"
+              company_id: "00000000-0000-0000-0000-000000000000" // Default company
             });
+            
+            if (createError) {
+              console.error("Error creating user profile:", createError);
+            }
           }
-        } catch (error) {
-          console.error("Error checking/creating user profile:", error);
+        } catch (profileError) {
+          console.error("Exception checking/creating user profile:", profileError);
         }
       }
       
@@ -124,12 +135,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "Bem-vindo ao TAGGUI Treinamentos"
       });
     } catch (error: any) {
+      console.error("Unhandled sign in error:", error);
       toast({
         title: "Erro no login",
         description: error.message || "Verifique suas credenciais",
         variant: "destructive"
       });
-      throw error;
     } finally {
       setLoading(false);
     }
@@ -155,7 +166,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error("Sign up error:", error);
-        throw error;
+        toast({
+          title: "Erro no cadastro",
+          description: error.message || "Não foi possível criar a conta",
+          variant: "destructive"
+        });
+        return;
       }
       
       if (data?.user) {
@@ -163,12 +179,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Create user in public.users table
         try {
-          await supabase.from("users").insert({
+          const { error: insertError } = await supabase.from("users").insert({
             id: data.user.id,
             email: data.user.email || "",
             name: name,
             company_id: companyId
           });
+          
+          if (insertError) {
+            console.error("Error creating user profile:", insertError);
+            toast({
+              title: "Erro no cadastro",
+              description: "Usuário criado, mas houve um erro ao configurar o perfil",
+              variant: "destructive"
+            });
+            return;
+          }
           
           console.log("User profile created in database");
         } catch (profileError) {
@@ -184,12 +210,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       navigate('/login');
       
     } catch (error: any) {
+      console.error("Unhandled sign up error:", error);
       toast({
         title: "Erro no cadastro",
         description: error.message || "Não foi possível criar a conta",
         variant: "destructive"
       });
-      throw error;
     } finally {
       setLoading(false);
     }
@@ -198,14 +224,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Sign out function
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Sign out error:", error);
+        toast({
+          title: "Erro ao sair",
+          description: error.message || "Ocorreu um problema ao sair",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       // Redirect will be handled by onAuthStateChange
     } catch (error: any) {
+      console.error("Unhandled sign out error:", error);
       toast({
         title: "Erro ao sair",
         description: error.message || "Ocorreu um problema ao sair",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -219,7 +260,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       if (error) {
-        throw error;
+        console.error("Reset password error:", error);
+        toast({
+          title: "Erro ao enviar email",
+          description: error.message || "Não foi possível enviar o email de redefinição",
+          variant: "destructive"
+        });
+        return;
       }
 
       toast({
@@ -228,12 +275,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
     } catch (error: any) {
+      console.error("Unhandled reset password error:", error);
       toast({
         title: "Erro ao enviar email",
         description: error.message || "Não foi possível enviar o email de redefinição",
         variant: "destructive"
       });
-      throw error;
     } finally {
       setLoading(false);
     }
@@ -249,7 +296,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       if (error) {
-        throw error;
+        console.error("Update password error:", error);
+        toast({
+          title: "Erro ao atualizar senha",
+          description: error.message || "Não foi possível atualizar sua senha",
+          variant: "destructive"
+        });
+        return;
       }
 
       toast({
@@ -260,12 +313,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       navigate('/login');
       
     } catch (error: any) {
+      console.error("Unhandled update password error:", error);
       toast({
         title: "Erro ao atualizar senha",
         description: error.message || "Não foi possível atualizar sua senha",
         variant: "destructive"
       });
-      throw error;
     } finally {
       setLoading(false);
     }

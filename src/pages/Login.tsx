@@ -8,28 +8,36 @@ import { Label } from "@/components/ui/label";
 import TagguiLogo from "@/components/layout/TagguiLogo";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Link } from "react-router-dom";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { signIn, resetPassword, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
-    if (forgotPasswordMode) {
-      await resetPassword(email);
-      setResetSent(true);
-    } else {
-      await signIn(email, password);
+    try {
+      if (forgotPasswordMode) {
+        await resetPassword(email);
+        setResetSent(true);
+      } else {
+        await signIn(email, password);
+      }
+    } catch (err: any) {
+      setError(err.message || "Ocorreu um erro. Por favor, tente novamente.");
     }
   };
 
   const toggleMode = () => {
     setForgotPasswordMode(!forgotPasswordMode);
     setResetSent(false);
+    setError(null);
   };
 
   return (
@@ -49,11 +57,18 @@ const Login = () => {
         </CardHeader>
         <CardContent>
           {resetSent && (
-            <Alert className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="mb-4 bg-green-50 border-green-300">
+              <AlertCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-700">
                 Um email foi enviado com instruções para redefinir sua senha.
               </AlertDescription>
+            </Alert>
+          )}
+          
+          {error && (
+            <Alert className="mb-4" variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
@@ -97,7 +112,7 @@ const Login = () => {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col">
+        <CardFooter className="flex flex-col space-y-2">
           <Button 
             variant="link" 
             onClick={toggleMode}
@@ -105,6 +120,16 @@ const Login = () => {
           >
             {forgotPasswordMode ? "Voltar para login" : "Esqueceu a senha?"}
           </Button>
+          
+          {!forgotPasswordMode && (
+            <div className="text-center text-sm">
+              Não tem uma conta?{" "}
+              <Link to="/register" className="text-taggui-primary hover:underline">
+                Cadastre-se
+              </Link>
+            </div>
+          )}
+          
           <p className="text-center text-sm mt-2">
             Sistema integrado TAGGUI Treinamentos e RH
           </p>
