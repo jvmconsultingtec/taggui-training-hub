@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { fetchAssignedTrainings, fetchTrainingProgress } from "@/services/api";
+import { fetchAssignedTrainings, fetchTrainingProgress, fetchUserTrainingProgress } from "@/services/api";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Check, Clock, Play } from "lucide-react";
@@ -45,45 +45,75 @@ const ProgressPage = () => {
       try {
         setLoading(true);
         setError(null);
-        const assignments = await fetchAssignedTrainings(user.id);
         
-        if (!assignments || assignments.length === 0) {
-          setLoading(false);
-          return;
+        // Use the dedicated method to fetch user progress with trainings
+        const progressData = await fetchUserTrainingProgress(user.id);
+        
+        if (!progressData || progressData.length === 0) {
+          console.log("No progress data found");
+          
+          // If no progress data, try to get assigned trainings
+          const assignments = await fetchAssignedTrainings(user.id);
+          
+          if (!assignments || assignments.length === 0) {
+            console.log("No assignments found");
+            setLoading(false);
+            return;
+          }
+          
+          // Create training with progress objects from assignments
+          const trainingWithProgress = assignments.map(assignment => {
+            const training = assignment.training;
+            
+            if (!training) {
+              console.error("Training data missing in assignment:", assignment);
+              return null;
+            }
+            
+            return {
+              id: training.id,
+              title: training.title,
+              description: training.description,
+              duration_min: training.duration_min,
+              progress_pct: 0,
+              status: "not_started" as TrainingStatus,
+              tags: training.tags,
+            };
+          }).filter(Boolean) as TrainingWithProgress[];
+          
+          setTrainings(trainingWithProgress);
+        } else {
+          // Map progress data to trainings with progress
+          const trainingWithProgress = progressData.map(item => {
+            const training = item.training;
+            
+            if (!training) {
+              console.error("Training data missing in progress:", item);
+              return null;
+            }
+            
+            // Determine status
+            let status: TrainingStatus = "not_started";
+            if (item.completed_at) {
+              status = "completed";
+            } else if (item.progress_pct > 0) {
+              status = "in_progress";
+            }
+            
+            return {
+              id: training.id,
+              title: training.title,
+              description: training.description,
+              duration_min: training.duration_min,
+              progress_pct: item.progress_pct || 0,
+              status: status,
+              last_viewed_at: item.last_viewed_at,
+              tags: training.tags,
+            };
+          }).filter(Boolean) as TrainingWithProgress[];
+          
+          setTrainings(trainingWithProgress);
         }
-        
-        const trainingWithProgressPromises = assignments.map(async (assignment) => {
-          const training = assignment.training;
-          
-          if (!training) {
-            console.error("Training data missing in assignment:", assignment);
-            return null;
-          }
-          
-          const progress = await fetchTrainingProgress(training.id, user.id);
-          
-          // Determine status
-          let status: TrainingStatus = "not_started";
-          if (progress?.completed_at) {
-            status = "completed";
-          } else if (progress?.progress_pct > 0) {
-            status = "in_progress";
-          }
-          
-          return {
-            id: training.id,
-            title: training.title,
-            description: training.description,
-            duration_min: training.duration_min,
-            progress_pct: progress?.progress_pct || 0,
-            status: status,
-            last_viewed_at: progress?.last_viewed_at,
-            tags: training.tags,
-          };
-        });
-        
-        const trainingWithProgress = (await Promise.all(trainingWithProgressPromises)).filter(Boolean) as TrainingWithProgress[];
-        setTrainings(trainingWithProgress);
       } catch (err: any) {
         console.error("Erro ao carregar progresso dos treinamentos:", err);
         setError("Não foi possível carregar seu progresso. Por favor, tente novamente mais tarde.");
@@ -172,17 +202,15 @@ const ProgressPage = () => {
                       </div>
                     </div>
                     
-                    {training.status !== "not_started" && (
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <ProgressBar 
-                            className={`h-2 ${getStatusColor(training.status)} bg-gray-200`}
-                            value={training.progress_pct}
-                          />
-                        </div>
-                        <div className="text-sm font-medium">{Math.round(training.progress_pct)}%</div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <ProgressBar 
+                          className={`h-2 ${getStatusColor(training.status)} bg-gray-200`}
+                          value={training.progress_pct}
+                        />
                       </div>
-                    )}
+                      <div className="text-sm font-medium">{Math.round(training.progress_pct)}%</div>
+                    </div>
                     
                     <div className="flex justify-between flex-wrap items-center text-xs text-muted-foreground">
                       <div className="flex items-center gap-4">

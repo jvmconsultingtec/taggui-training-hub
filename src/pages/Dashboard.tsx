@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchAssignedTrainings, fetchCurrentUser } from "@/services/api";
+import { fetchAssignedTrainings, fetchCurrentUser, fetchUserTrainingProgress } from "@/services/api";
 import Layout from "@/components/layout/Layout";
 import { TrainingStats } from "@/components/dashboard/TrainingStats";
 import TrainingCard from "@/components/trainings/TrainingCard";
@@ -20,7 +20,14 @@ type Assignment = {
     duration_min: number;
     video_type: "UPLOAD" | "YOUTUBE";
     video_url: string;
+    tags: string[] | null;
   };
+};
+
+type TrainingProgress = {
+  training_id: string;
+  progress_pct: number;
+  completed_at: string | null;
 };
 
 const Dashboard = () => {
@@ -29,6 +36,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [progressMap, setProgressMap] = useState<Record<string, TrainingProgress>>({});
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -67,11 +75,28 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
         
-        console.log("Loading trainings for user:", user.id);
+        console.log("Loading trainings and progress for user:", user.id);
         
-        const data = await fetchAssignedTrainings(user.id);
-        console.log("Trainings loaded:", data.length);
-        setTrainings(data);
+        // Fetch assigned trainings
+        const assignments = await fetchAssignedTrainings(user.id);
+        setTrainings(assignments);
+        console.log("Trainings loaded:", assignments.length);
+        
+        // Fetch progress for all trainings
+        const progress = await fetchUserTrainingProgress(user.id);
+        console.log("Progress loaded:", progress.length);
+        
+        // Create a map of training_id to progress data
+        const progressMapData: Record<string, TrainingProgress> = {};
+        progress.forEach(item => {
+          progressMapData[item.training_id] = {
+            training_id: item.training_id,
+            progress_pct: item.progress_pct || 0,
+            completed_at: item.completed_at
+          };
+        });
+        
+        setProgressMap(progressMapData);
       } catch (err: any) {
         console.error("Error loading trainings:", err);
         setError("Não foi possível carregar os treinamentos. Por favor, tente novamente mais tarde.");
@@ -89,8 +114,22 @@ const Dashboard = () => {
 
   // Stats calculations
   const totalTrainings = trainings.length;
-  const completedTrainings = 0; // This would come from progress data
-  const inProgressTrainings = totalTrainings - completedTrainings;
+  const completedTrainings = Object.values(progressMap).filter(p => p.completed_at !== null).length;
+  const inProgressTrainings = Object.values(progressMap).filter(p => !p.completed_at && p.progress_pct > 0).length;
+
+  // Get status for a training
+  const getTrainingStatus = (trainingId: string) => {
+    const progress = progressMap[trainingId];
+    if (!progress) return "not_started";
+    if (progress.completed_at) return "completed";
+    if (progress.progress_pct > 0) return "in_progress";
+    return "not_started";
+  };
+
+  // Get progress for a training
+  const getTrainingProgress = (trainingId: string) => {
+    return progressMap[trainingId]?.progress_pct || 0;
+  };
 
   return (
     <Layout>
@@ -147,6 +186,8 @@ const Dashboard = () => {
                 <TrainingCard 
                   key={assignment.id} 
                   training={assignment.training}
+                  status={getTrainingStatus(assignment.training.id)}
+                  progress={getTrainingProgress(assignment.training.id)}
                 />
               ))}
             </div>

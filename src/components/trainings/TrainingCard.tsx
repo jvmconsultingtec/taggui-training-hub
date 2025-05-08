@@ -19,6 +19,7 @@ export interface TrainingCardProps {
     duration_min: number;
     video_type: "UPLOAD" | "YOUTUBE";
     video_url: string;
+    tags?: string[] | null;
   };
 }
 
@@ -52,13 +53,15 @@ const TrainingCard = (props: TrainingCardProps) => {
     thumbnailUrl
   } = props;
 
-  // Calculate progress bar width based on status instead of actual progress percentage
+  // Calculate progress bar width
   const progressWidth = status === "completed" ? 100 : 
-                       status === "in_progress" ? 50 : 0;
+                       status === "in_progress" ? (progress || 50) : 0;
+
+  const tags = props.training?.tags || [];
 
   return (
     <Link to={`/trainings/${id}`} className="block group">
-      <div className="taggui-card group-hover:shadow-md transition-shadow">
+      <div className="border border-gray-200 rounded-md p-4 group-hover:shadow-md transition-shadow">
         <div className="relative">
           <div className="aspect-video rounded-md bg-gray-200 overflow-hidden mb-3">
             {thumbnailUrl ? (
@@ -114,6 +117,20 @@ const TrainingCard = (props: TrainingCardProps) => {
                 <span className="font-medium">{statusLabels[status]}</span>
               </div>
             </div>
+            
+            {/* Display tags */}
+            {tags && tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1 pt-2">
+                {tags.map((tag, index) => (
+                  <span 
+                    key={index} 
+                    className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

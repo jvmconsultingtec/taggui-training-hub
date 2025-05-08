@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -481,16 +480,20 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
 
 export const fetchUserTrainingProgress = async (userId: string) => {
   try {
+    // Verify we have an authenticated session before making the request
+    await checkAuth();
+    
     const { data, error } = await supabase
       .from("training_progress")
       .select(`
         *,
         training:trainings (*)
       `)
-      .eq("user_id", userId)
-      .order("last_viewed_at", { ascending: false });
+      .eq("user_id", userId);
     
     if (error) throw error;
+    
+    console.log("User training progress fetched:", data?.length || 0);
     return data || [];
   } catch (error) {
     handleError(error, "Error fetching user training progress:");

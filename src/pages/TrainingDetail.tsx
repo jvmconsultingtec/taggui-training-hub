@@ -141,14 +141,19 @@ const TrainingDetail = () => {
       setStatusChanging(true);
       console.log(`Changing status from ${status} to ${newStatus}`);
       
-      // For completed status, set progress to 100%
-      const newProgress = newStatus === "completed" ? 100 : progress;
+      // Calculate new progress based on status
+      let newProgress = progress;
+      if (newStatus === "completed" && progress < 100) {
+        newProgress = 100;
+      } else if (newStatus === "in_progress" && progress === 0) {
+        newProgress = 10; // Start with some progress
+      } else if (newStatus === "not_started") {
+        newProgress = 0; // Reset progress
+      }
       
       // Update local state first for responsive UI
       setStatus(newStatus);
-      if (newStatus === "completed" && progress < 100) {
-        setProgress(100);
-      }
+      setProgress(newProgress);
       
       // Send to API
       await updateTrainingProgress(
@@ -160,12 +165,10 @@ const TrainingDetail = () => {
       
       console.log(`Status updated to ${newStatus} with progress ${newProgress}%`);
       
-      if (newStatus === "completed") {
-        toast({
-          title: "Status atualizado",
-          description: "Treinamento marcado como concluído"
-        });
-      }
+      toast({
+        title: "Status atualizado",
+        description: `Treinamento marcado como ${newStatus === "completed" ? "concluído" : newStatus === "in_progress" ? "em andamento" : "não iniciado"}`
+      });
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
@@ -300,6 +303,13 @@ const TrainingDetail = () => {
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
               <span>Adicionado em {new Date(training.created_at).toLocaleDateString()}</span>
+            </div>
+          )}
+          {training.tags && training.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {training.tags.map((tag: string, i: number) => (
+                <Badge key={i} variant="outline">{tag}</Badge>
+              ))}
             </div>
           )}
         </div>

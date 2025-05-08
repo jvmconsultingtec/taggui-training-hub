@@ -112,7 +112,7 @@ const TrainingsList = () => {
   
   // Get all unique tags from trainings
   const allTags = Array.from(
-    new Set(trainings.flatMap(training => training.tags || []))
+    new Set(trainings.flatMap(training => training.tags || []).filter(Boolean))
   );
   
   // Filter trainings based on search query and tags
@@ -203,24 +203,26 @@ const TrainingsList = () => {
             />
           </div>
           
-          <div className="flex items-center gap-2">
-            <Filter size={18} className="text-gray-500" />
-            <div className="flex flex-wrap gap-2">
-              {allTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    filterTags.includes(tag)
-                      ? "bg-taggui-primary text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
+          {allTags.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Filter size={18} className="text-gray-500" />
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      filterTags.includes(tag)
+                        ? "bg-taggui-primary text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
         
         {/* Trainings table */}
@@ -281,6 +283,9 @@ const TrainingsList = () => {
                               {tag}
                             </span>
                           ))}
+                          {(!training.tags || training.tags.length === 0) && (
+                            <span className="text-xs text-gray-400">Sem tags</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
