@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   BarChart, 
   VideoIcon, 
@@ -10,9 +10,11 @@ import {
   Briefcase, 
   FileText,
   Menu, 
-  X 
+  X,
+  ShieldCheck
 } from "lucide-react";
 import TagguiLogo from "./TagguiLogo";
+import { supabase, executeRPC } from "@/integrations/supabase/client";
 
 type NavItemProps = {
   to: string;
@@ -41,8 +43,23 @@ const NavItem = ({ to, icon, label, isActive, isCollapsed }: NavItemProps) => {
 const Sidebar = () => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const isActive = (path: string) => location.pathname.startsWith(path);
+  
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const isAdminResult = await executeRPC<boolean>('is_admin');
+        setIsAdmin(!!isAdminResult);
+      } catch (error) {
+        console.error("Erro ao verificar status de admin:", error);
+        setIsAdmin(false);
+      }
+    };
+    
+    checkAdminStatus();
+  }, []);
   
   return (
     <div 
@@ -72,7 +89,7 @@ const Sidebar = () => {
           to="/trainings" 
           icon={<VideoIcon />} 
           label="Treinamentos" 
-          isActive={isActive("/trainings")} 
+          isActive={isActive("/trainings") && !isActive("/admin")} 
           isCollapsed={collapsed}
         />
         <NavItem 
@@ -110,6 +127,18 @@ const Sidebar = () => {
           isActive={isActive("/settings")} 
           isCollapsed={collapsed}
         />
+        
+        {isAdmin && (
+          <div className="mt-6 border-t pt-6 border-gray-200">
+            <NavItem 
+              to="/admin" 
+              icon={<ShieldCheck className="text-blue-600" />} 
+              label="Painel Admin" 
+              isActive={isActive("/admin")} 
+              isCollapsed={collapsed}
+            />
+          </div>
+        )}
       </nav>
     </div>
   );

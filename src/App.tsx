@@ -6,12 +6,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { AdminRoute } from "./components/auth/AdminRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminPanel from "./pages/admin/AdminPanel";
 import TrainingDetail from "./pages/TrainingDetail";
 import TrainingsList from "./pages/TrainingsList";
 import TrainingForm from "./pages/TrainingForm";
@@ -56,11 +57,16 @@ const App = () => (
               <Route path="/company" element={<Company />} />
               <Route path="/settings" element={<Settings />} />
               
-              {/* Admin routes */}
-              <Route path="/admin" element={<AdminDashboard />} />
+              {/* Non-admin routes */}
               <Route path="/trainings" element={<TrainingsList />} />
-              <Route path="/trainings/new" element={<TrainingForm />} />
-              <Route path="/trainings/edit/:id" element={<TrainingForm />} />
+            </Route>
+            
+            {/* Admin-only routes */}
+            <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/admin/trainings" element={<TrainingsList />} />
+              <Route path="/admin/trainings/new" element={<TrainingForm />} />
+              <Route path="/admin/trainings/edit/:id" element={<TrainingForm />} />
             </Route>
             
             {/* Catch-all for 404 */}
