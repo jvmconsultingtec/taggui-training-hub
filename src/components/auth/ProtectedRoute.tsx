@@ -37,7 +37,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Check if session is valid
+  // Check if user is authenticated
   if (!user || !session) {
     console.log("No authenticated user or session found, redirecting to login");
     return <Navigate to={redirectTo} replace />;
@@ -51,6 +51,5 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Display children only if user is authenticated
-  // Role-based check would be implemented here when user roles are fetched
   return <Outlet />;
 };

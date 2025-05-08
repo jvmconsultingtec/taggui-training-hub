@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           (event, sessionData) => {
             console.log("Auth state change:", event, sessionData?.user?.id);
             
+            // Update state with atomic operation to prevent partial updates
             setUser(sessionData?.user ?? null);
             setSession(sessionData);
             
@@ -87,10 +88,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.setItem('returnUrl', currentPath);
       }
       
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
+        console.error("Sign in error:", error);
         throw error;
+      }
+      
+      if (data?.user) {
+        console.log("User signed in successfully:", data.user.id);
       }
       
       toast({
@@ -116,7 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       const companyId = "00000000-0000-0000-0000-000000000000";
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -128,7 +134,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       if (error) {
+        console.error("Sign up error:", error);
         throw error;
+      }
+      
+      if (data?.user) {
+        console.log("User registered successfully:", data.user.id);
       }
 
       toast({
