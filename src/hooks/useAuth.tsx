@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
@@ -79,11 +78,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       
       // Chamada explícita à função 'is_admin' sem parâmetros
       // Adicionamos um objeto vazio como parâmetro para evitar ambiguidade
-      // e definimos explicitamente as opções count e head como false
-      const { data, error } = await supabase.rpc('is_admin', {}, {
-        count: 'none',
-        head: false
-      });
+      // e removemos as opções incorretas que estavam causando o erro
+      const { data, error } = await supabase.rpc('is_admin', {});
         
       if (error) {
         console.error("Error checking admin status in useAuth:", error);
