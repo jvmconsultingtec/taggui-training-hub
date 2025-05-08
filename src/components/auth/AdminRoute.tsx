@@ -2,55 +2,17 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 
 export const AdminRoute = () => {
-  const { user, session, loading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [checkingPermissions, setCheckingPermissions] = useState(true);
+  const { user, session, loading, isAdmin } = useAuth();
   
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) {
-        setCheckingPermissions(false);
-        return;
-      }
-      
-      try {
-        // Use the security definer function to check admin status
-        const { data: isAdminResult, error } = await supabase.rpc('is_admin');
-        
-        if (error) {
-          console.error("Error checking admin status:", error);
-          throw error;
-        }
-        
-        console.log("AdminRoute - Is user admin?", isAdminResult);
-        setIsAdmin(isAdminResult);
-      } catch (error) {
-        console.error("Erro ao verificar permissões:", error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível verificar suas permissões",
-          variant: "destructive"
-        });
-        setIsAdmin(false);
-      } finally {
-        setCheckingPermissions(false);
-      }
-    };
-    
-    if (!loading && user) {
-      checkAdminStatus();
-    } else if (!loading && !user) {
-      setCheckingPermissions(false);
-    }
-  }, [user, loading]);
+  console.log("AdminRoute - User:", user?.email);
+  console.log("AdminRoute - Is user admin?", isAdmin);
 
   // Mostrar carregamento enquanto verifica autenticação ou permissões
-  if (loading || checkingPermissions) {
+  if (loading) {
     return (
       <div className="flex flex-col gap-4 p-8">
         <Skeleton className="h-8 w-full" />

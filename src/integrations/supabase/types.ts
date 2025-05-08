@@ -377,6 +377,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { user_id?: string }
         Returns: boolean
       }
+      is_user_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
       promover_a_admin: {
         Args: { email_usuario: string }
         Returns: string

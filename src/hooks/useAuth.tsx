@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         
         if (currentSession?.user) {
           // Verificar se o usuário é administrador
-          checkAdminStatus(currentSession.user.id);
+          checkAdminStatus();
         } else {
           setIsAdmin(false);
           console.info("No active session found");
@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         setSession(data.session);
         setUser(data.session.user);
         // Verificar se o usuário é administrador
-        checkAdminStatus(data.session.user.id);
+        checkAdminStatus();
       } else {
         setLoading(false);
       }
@@ -73,8 +73,9 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   }, []);
   
   // Função para verificar se o usuário é administrador
-  const checkAdminStatus = async (userId: string) => {
+  const checkAdminStatus = async () => {
     try {
+      console.log("Checking admin status in useAuth");
       // Use the direct RPC function to avoid recursion issues
       const { data, error } = await supabase.rpc('is_admin');
         
@@ -149,7 +150,6 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     }
   };
   
-  // Add the updatePassword function
   const updatePassword = async (password: string) => {
     try {
       const { error } = await supabase.auth.updateUser({ 
