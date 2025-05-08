@@ -335,6 +335,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_same_company_access: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       check_user_access: {
         Args: { user_id: string; company_id: string }
         Returns: boolean

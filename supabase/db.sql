@@ -91,3 +91,17 @@ BEGIN
 END;
 $$;
 
+-- Create a function to get the current user's company ID
+-- This avoids recursion issues in RLS policies
+CREATE OR REPLACE FUNCTION public.get_current_user_company_id()
+RETURNS UUID
+LANGUAGE SQL
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  -- Direct query to public.users to get the company_id
+  SELECT company_id 
+  FROM public.users 
+  WHERE id = auth.uid()
+  LIMIT 1;
+$$;

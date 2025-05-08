@@ -134,7 +134,7 @@ const UserGroupForm = () => {
           description: "O grupo foi atualizado com sucesso",
         });
       } else {
-        // Criar novo grupo
+        // Criar novo grupo com o company_id explícito
         const { data, error } = await supabase
           .from("user_groups")
           .insert({
