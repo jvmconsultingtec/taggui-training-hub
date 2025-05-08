@@ -75,7 +75,8 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
       throw error;
     }
     
-    return data || [];
+    // Ensure we return an array, even if data is null
+    return (data || []) as T[];
   } catch (error) {
     console.error(`Exception in RPC ${functionName}:`, error);
     throw error;
