@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Check, Clock, Play } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
+import { Progress as ProgressBar } from "@/components/ui/progress";
 
 type TrainingStatus = "not_started" | "in_progress" | "completed";
 
@@ -30,7 +30,7 @@ const statusIcons = {
   completed: <Check className="h-4 w-4 mr-1" />
 };
 
-const Progress = () => {
+const ProgressPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [trainings, setTrainings] = useState<TrainingWithProgress[]>([]);
@@ -161,9 +161,9 @@ const Progress = () => {
                     {training.status !== "not_started" && (
                       <div className="flex items-center gap-4">
                         <div className="flex-1">
-                          <Progress 
-                            value={training.progress_pct} 
-                            className={`h-2 ${getStatusColor(training.status)} bg-gray-200`} 
+                          <ProgressBar 
+                            className={`h-2 ${getStatusColor(training.status)} bg-gray-200`}
+                            value={training.progress_pct}
                           />
                         </div>
                         <div className="text-sm font-medium">{Math.round(training.progress_pct)}%</div>
@@ -201,4 +201,4 @@ const Progress = () => {
   );
 };
 
-export default Progress;
+export default ProgressPage;

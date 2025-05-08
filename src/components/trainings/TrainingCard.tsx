@@ -52,6 +52,10 @@ const TrainingCard = (props: TrainingCardProps) => {
     thumbnailUrl
   } = props;
 
+  // Calculate progress bar width based on status
+  const progressWidth = status === "completed" ? 100 : 
+                       status === "in_progress" ? 50 : 0;
+
   return (
     <Link to={`/trainings/${id}`} className="block group">
       <div className="taggui-card group-hover:shadow-md transition-shadow">
@@ -102,7 +106,7 @@ const TrainingCard = (props: TrainingCardProps) => {
                     status === "completed" ? "bg-green-500" : 
                     status === "in_progress" ? "bg-blue-500" : "bg-gray-300"
                   }`}
-                  style={{ width: `${progress}%` }}
+                  style={{ width: `${progressWidth}%` }}
                 ></div>
               </div>
               <div className="flex justify-between mt-1 text-xs text-gray-500">
