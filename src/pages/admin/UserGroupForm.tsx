@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -12,6 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
+interface UserWithCompany {
+  id: string;
+  company_id?: string;
+}
+
 const UserGroupForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -20,14 +24,36 @@ const UserGroupForm = () => {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [companyId, setCompanyId] = useState<string | undefined>(undefined);
   
   const isEditMode = !!id;
   
   useEffect(() => {
+    // Get the company ID for the current user
+    const fetchUserCompany = async () => {
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from("users")
+            .select("company_id")
+            .eq("id", user.id)
+            .single();
+            
+          if (error) throw error;
+          
+          setCompanyId(data.company_id);
+        } catch (error) {
+          console.error("Error fetching company ID:", error);
+        }
+      }
+    };
+    
+    fetchUserCompany();
+    
     if (isEditMode) {
       loadGroupData();
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   const loadGroupData = async () => {
     try {
@@ -68,6 +94,15 @@ const UserGroupForm = () => {
       return;
     }
     
+    if (!companyId) {
+      toast({
+        title: "Erro",
+        description: "Informações da empresa não disponíveis",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setSaving(true);
       
@@ -95,7 +130,7 @@ const UserGroupForm = () => {
             name,
             description: description.trim() || null,
             created_by: user?.id,
-            company_id: user?.company_id
+            company_id: companyId
           });
           
         if (error) throw error;

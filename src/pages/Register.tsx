@@ -34,7 +34,12 @@ const Register = () => {
     }
     
     try {
-      await signUp(email, password, name);
+      // Fix: Pass name as an object instead of a string
+      const { error } = await signUp(email, password, { name });
+      if (error) {
+        throw error;
+      }
+      
       toast({
         title: "Conta criada com sucesso",
         description: "Verifique seu email para confirmar o cadastro."

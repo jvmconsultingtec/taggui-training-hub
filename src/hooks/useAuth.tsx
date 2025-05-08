@@ -12,6 +12,7 @@ interface AuthState {
   signUp: (email: string, password: string, metadata?: object) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: any }>;
+  updatePassword: (password: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -149,6 +150,20 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       return { error };
     }
   };
+  
+  // Add the updatePassword function
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ 
+        password 
+      });
+      
+      return { error };
+    } catch (error) {
+      console.error("Update password error:", error);
+      return { error };
+    }
+  };
 
   const value = {
     user,
@@ -159,6 +174,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     signUp,
     signOut,
     resetPassword,
+    updatePassword, // Add it to the context value
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

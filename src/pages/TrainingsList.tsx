@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Filter, Search, MoreVertical, Edit, Trash2, Users, Loader } from "lucide-react";
+import { Filter, Search, MoreVertical, Edit, Trash2, Users, Loader, PlusCircle } from "lucide-react";
 import Layout from "../components/layout/Layout";
 import { fetchTrainings, deleteTraining, fetchCurrentUser, fetchUserTrainingProgress } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
