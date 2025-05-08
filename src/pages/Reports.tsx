@@ -136,8 +136,8 @@ const Reports = () => {
           const { count: started } = await supabase
             .from("training_progress")
             .select("*", { count: 'exact', head: true })
-            .gte("created_at", month.startDate.toISOString())
-            .lte("created_at", month.endDate.toISOString());
+            .gte("last_viewed_at", month.startDate.toISOString())
+            .lte("last_viewed_at", month.endDate.toISOString());
             
           return {
             name: month.name,
@@ -167,11 +167,17 @@ const Reports = () => {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        const { count: activeUsers } = await supabase
+        // Count unique user IDs with activity in the last 30 days
+        const { data: activeUsersList } = await supabase
           .from("training_progress")
-          .select("user_id", { count: 'exact', head: true })
-          .gte("last_viewed_at", thirtyDaysAgo.toISOString())
-          .distinct();
+          .select("user_id")
+          .gte("last_viewed_at", thirtyDaysAgo.toISOString());
+          
+        // Get unique user IDs by filtering the data manually
+        const uniqueUserIds = activeUsersList 
+          ? [...new Set(activeUsersList.map(item => item.user_id))]
+          : [];
+        const activeUsers = uniqueUserIds.length;
           
         // Get new users in the last 30 days
         const { count: newUsers } = await supabase
@@ -179,7 +185,7 @@ const Reports = () => {
           .select("*", { count: 'exact', head: true })
           .gte("created_at", thirtyDaysAgo.toISOString());
           
-        // Get completion rate (completed trainings / total assigned trainings)
+        // Get completion rate (completed trainings / total assignments)
         const { count: totalAssignments } = await supabase
           .from("training_assignments")
           .select("*", { count: 'exact', head: true });
@@ -189,14 +195,14 @@ const Reports = () => {
           .select("*", { count: 'exact', head: true })
           .not("completed_at", "is", null);
           
-        const completionRate = totalAssignments > 0 
-          ? Math.round((completedTrainings / totalAssignments) * 100) 
+        const completionRate = totalAssignments && totalAssignments > 0 
+          ? Math.round((completedTrainings || 0) / totalAssignments * 100) 
           : 0;
           
         // Get average completion time (average days between assignment and completion)
         const { data: completions } = await supabase
           .from("training_progress")
-          .select("created_at, completed_at")
+          .select("*")
           .not("completed_at", "is", null)
           .limit(100); // Limit to recent 100 completions for performance
           
@@ -205,8 +211,8 @@ const Reports = () => {
         
         if (completions && completions.length > 0) {
           completions.forEach(completion => {
-            if (completion.created_at && completion.completed_at) {
-              const startDate = new Date(completion.created_at);
+            if (completion.last_viewed_at && completion.completed_at) {
+              const startDate = new Date(completion.last_viewed_at);
               const endDate = new Date(completion.completed_at);
               const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
               
@@ -229,7 +235,7 @@ const Reports = () => {
         setEngagementData({
           averageCompletionTime,
           completionRate,
-          activeUsers: activeUsers || 0,
+          activeUsers: activeUsers,
           previousTimeComparison,
           previousRateComparison,
           newUsers: newUsers || 0
