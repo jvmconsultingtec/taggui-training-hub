@@ -10,6 +10,7 @@ const Index = () => {
   useEffect(() => {
     if (!loading) {
       if (user) {
+        console.log("User authenticated, isAdmin:", isAdmin);
         if (isAdmin) {
           navigate("/admin");
         } else {
