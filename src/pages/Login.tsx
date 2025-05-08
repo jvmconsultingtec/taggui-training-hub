@@ -27,9 +27,11 @@ const Login = () => {
         await resetPassword(email);
         setResetSent(true);
       } else {
+        console.log("Attempting login with:", email);
         await signIn(email, password);
       }
     } catch (err: any) {
+      console.error("Login form error:", err);
       setError(err.message || "Ocorreu um erro. Por favor, tente novamente.");
     }
   };

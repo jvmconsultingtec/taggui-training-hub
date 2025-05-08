@@ -57,8 +57,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     const loadTrainings = async () => {
-      if (!user || !session) {
-        console.log("No user or session, skipping training load");
+      if (!user) {
+        console.log("No user, skipping training load");
         setLoading(false);
         return;
       }
@@ -68,9 +68,6 @@ const Dashboard = () => {
         setError(null);
         
         console.log("Loading trainings for user:", user.id);
-        if (session.expires_at) {
-          console.log("Session expires at:", new Date(session.expires_at * 1000).toLocaleString());
-        }
         
         const data = await fetchAssignedTrainings(user.id);
         console.log("Trainings loaded:", data.length);
@@ -84,7 +81,7 @@ const Dashboard = () => {
     };
 
     loadTrainings();
-  }, [user, session, retryCount]);
+  }, [user, retryCount]);
 
   const handleRetry = () => {
     setRetryCount(prev => prev + 1);
