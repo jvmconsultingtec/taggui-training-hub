@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -187,15 +188,17 @@ const TrainingGroupAssignment = () => {
               user_id: member.user_id
             }));
             
-            // Fix: Use upsert instead of onConflict
-            const { error: assignError } = await supabase
-              .from("training_assignments")
-              .upsert(userAssignments, { 
-                onConflict: ['training_id', 'user_id'],
-                ignoreDuplicates: true
-              });
-              
-            if (assignError) throw assignError;
+            // Fix: Process each assignment individually or use upsert properly
+            for (const assignment of userAssignments) {
+              const { error: assignError } = await supabase
+                .from("training_assignments")
+                .upsert(assignment, {
+                  onConflict: 'training_id,user_id',
+                  ignoreDuplicates: true
+                });
+                
+              if (assignError) throw assignError;
+            }
           }
         }
       }
