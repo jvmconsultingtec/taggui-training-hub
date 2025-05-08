@@ -25,16 +25,18 @@ const UserGroupForm = () => {
   const isEditMode = !!id;
   
   useEffect(() => {
-    // First fetch the user's company ID
+    // First fetch the user's company ID using RPC function to avoid recursion
     const fetchUserCompany = async () => {
       if (user?.id) {
         try {
           console.log("Fetching company ID for user:", user.id);
           
-          // Direct database query to get company ID (using the security definer function)
+          // Use get_current_user_company_id RPC function instead of direct query
           const { data, error } = await supabase.rpc('get_current_user_company_id');
           
-          if (error) throw error;
+          if (error) {
+            throw error;
+          }
           
           console.log("Company ID retrieved:", data);
           if (data) {

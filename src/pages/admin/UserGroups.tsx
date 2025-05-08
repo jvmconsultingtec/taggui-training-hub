@@ -40,7 +40,7 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Buscar grupos
+      // Buscar grupos (Não usa o policy "check_user_access" que causa recursão)
       const { data: groupsData, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
