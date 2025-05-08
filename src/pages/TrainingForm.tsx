@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, Upload, X, Plus } from "lucide-react";
@@ -47,6 +48,7 @@ const TrainingForm = () => {
   const [duration, setDuration] = useState(""); // User input in MM:SS or minutes format
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
+  const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PRIVATE");
   
   // File upload state
   const [file, setFile] = useState<File | null>(null);
@@ -83,6 +85,7 @@ const TrainingForm = () => {
       setVideoUrl(training.video_url);
       setDuration(training.duration_min.toString());
       setTags(training.tags || []);
+      setVisibility(training.visibility || "PRIVATE");
       
     } catch (error) {
       console.error("Error loading training:", error);
@@ -222,7 +225,8 @@ const TrainingForm = () => {
         video_url: finalVideoUrl,
         duration_min: durationMinutes,
         tags: tags.length > 0 ? tags : null,
-        company_id: "00000000-0000-0000-0000-000000000000" // Default company ID
+        company_id: "00000000-0000-0000-0000-000000000000", // Default company ID
+        visibility: visibility
       };
       
       if (id) {
@@ -319,6 +323,34 @@ const TrainingForm = () => {
                       onChange={(e) => setAuthor(e.target.value)}
                       placeholder="Digite o nome do autor ou departamento"
                     />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Visibilidade
+                    </label>
+                    <div className="flex space-x-4">
+                      <label className="flex items-center">
+                        <input 
+                          type="radio" 
+                          value="PUBLIC" 
+                          checked={visibility === "PUBLIC"}
+                          onChange={() => setVisibility("PUBLIC")}
+                          className="mr-2"
+                        />
+                        <span>Público</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input 
+                          type="radio" 
+                          value="PRIVATE" 
+                          checked={visibility === "PRIVATE"}
+                          onChange={() => setVisibility("PRIVATE")}
+                          className="mr-2"
+                        />
+                        <span>Privado</span>
+                      </label>
+                    </div>
                   </div>
                   
                   <div>
