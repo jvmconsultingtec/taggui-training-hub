@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { toast } from "@/hooks/use-toast";
 
 type Training = Database["public"]["Tables"]["trainings"]["Row"];
 type User = Database["public"]["Tables"]["users"]["Row"];
@@ -10,16 +11,19 @@ type Visibility = Database["public"]["Enums"]["visibility"];
 
 // Helper function to verify authentication
 const checkAuth = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error("No authenticated session found");
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session) {
+    console.error("Auth check failed:", error || "No session found");
+    throw new Error("Authentication required");
   }
+  
+  console.log("Auth check passed, user:", session.user.id);
   return session;
 };
 
 // Helper function for basic error handling
 const handleError = (error: any, message: string) => {
-  console.error(message, error);
+  console.error(`${message} Details:`, error);
   throw error;
 };
 
@@ -28,39 +32,40 @@ export const fetchCurrentUser = async () => {
   try {
     console.log("Fetching current user data");
     
-    // Ensure we have a valid session before making the request
-    await checkAuth();
-    
     // Get the current authenticated user from auth
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
     
+    if (authError || !session) {
+      console.error("No authenticated session:", authError);
+      return null;
+    }
+    
+    const { user: authUser } = session;
     if (!authUser) {
-      console.log("No authenticated user found");
+      console.log("No authenticated user found in session");
       return null;
     }
     
     console.log("Auth user found:", authUser.id);
     
-    // Direct query to users table with explicit ID
-    const { data: userProfile, error } = await supabase
+    // Look for the user profile
+    const { data: userProfile, error: profileError } = await supabase
       .from("users")
       .select("*")
       .eq("id", authUser.id)
       .single();
     
-    if (error) {
-      console.error("Error fetching user profile:", error);
-      // Try to use auth metadata as fallback
-      if (authUser.user_metadata) {
-        return {
-          id: authUser.id,
-          email: authUser.email || "",
-          name: authUser.user_metadata.name || authUser.email?.split("@")[0] || "",
-          company_id: authUser.user_metadata.company_id || "00000000-0000-0000-0000-000000000000",
-          role: authUser.user_metadata.role || "COLLABORATOR"
-        };
-      }
-      return null;
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+      
+      // Create a basic profile from auth metadata as fallback
+      return {
+        id: authUser.id,
+        email: authUser.email || "",
+        name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "User",
+        company_id: authUser.user_metadata?.company_id || "00000000-0000-0000-0000-000000000000",
+        role: authUser.user_metadata?.role || "COLLABORATOR"
+      };
     }
     
     console.log("User profile found:", userProfile);
@@ -110,7 +115,12 @@ export const fetchTrainings = async () => {
     console.log("Trainings fetched:", data?.length || 0);
     return data || [];
   } catch (error) {
-    handleError(error, "Error fetching trainings:");
+    console.error("Error in fetchTrainings:", error);
+    toast({
+      title: "Erro ao carregar treinamentos",
+      description: error instanceof Error ? error.message : "Erro desconhecido",
+      variant: "destructive"
+    });
     return [];
   }
 };
@@ -187,6 +197,8 @@ export const fetchAssignedTrainings = async (userId: string) => {
     // Verify we have an authenticated session before making the request
     await checkAuth();
     
+    console.log(`Fetching assigned trainings for user ${userId}`);
+    
     const { data, error } = await supabase
       .from("training_assignments")
       .select(`
@@ -195,10 +207,20 @@ export const fetchAssignedTrainings = async (userId: string) => {
       `)
       .eq("user_id", userId);
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching assigned trainings:", error);
+      throw error;
+    }
+    
+    console.log("Assigned trainings fetched:", data?.length || 0);
     return data || [];
   } catch (error) {
-    handleError(error, "Error fetching assigned trainings:");
+    console.error("Error in fetchAssignedTrainings:", error);
+    toast({
+      title: "Erro ao carregar treinamentos",
+      description: error instanceof Error ? error.message : "Erro desconhecido",
+      variant: "destructive"
+    });
     return [];
   }
 };

@@ -40,13 +40,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Check if user is authenticated
   if (!user || !session) {
     console.log("No authenticated user or session found, redirecting to login");
+    // Save the current location for redirect after login
+    localStorage.setItem('returnUrl', window.location.pathname);
     return <Navigate to={redirectTo} replace />;
   }
 
   // Check if session is expired
-  const isSessionExpired = session.expires_at * 1000 < Date.now();
+  const isSessionExpired = new Date(session.expires_at! * 1000) < new Date();
   if (isSessionExpired) {
     console.log("Session expired, redirecting to login");
+    // Save the current location for redirect after login
+    localStorage.setItem('returnUrl', window.location.pathname);
     return <Navigate to={redirectTo} replace />;
   }
 

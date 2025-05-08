@@ -32,12 +32,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         console.log("Initializing auth state");
         
-        // Set up auth state listener FIRST
+        // Set up auth state listener FIRST to prevent missing auth events
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (event, sessionData) => {
             console.log("Auth state change:", event, sessionData?.user?.id);
             
-            // Update state with atomic operation to prevent partial updates
             setUser(sessionData?.user ?? null);
             setSession(sessionData);
             
@@ -97,6 +96,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (data?.user) {
         console.log("User signed in successfully:", data.user.id);
+        
+        // Check if user exists in the users table, create if not
+        try {
+          const { data: userExists, error: userCheckError } = await supabase
+            .from("users")
+            .select("id")
+            .eq("id", data.user.id)
+            .single();
+            
+          if (userCheckError && userCheckError.code === "PGRST116") {
+            // User doesn't exist, create user profile
+            await supabase.from("users").insert({
+              id: data.user.id,
+              email: data.user.email || "",
+              name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "User",
+              company_id: "00000000-0000-0000-0000-000000000000"
+            });
+          }
+        } catch (error) {
+          console.error("Error checking/creating user profile:", error);
+        }
       }
       
       toast({
@@ -115,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Sign up function
+  // Sign up function with improved error handling
   const signUp = async (email: string, password: string, name: string) => {
     try {
       setLoading(true);
@@ -140,6 +160,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (data?.user) {
         console.log("User registered successfully:", data.user.id);
+        
+        // Create user in public.users table
+        try {
+          await supabase.from("users").insert({
+            id: data.user.id,
+            email: data.user.email || "",
+            name: name,
+            company_id: companyId
+          });
+          
+          console.log("User profile created in database");
+        } catch (profileError) {
+          console.error("Error creating user profile:", profileError);
+        }
       }
 
       toast({

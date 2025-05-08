@@ -8,7 +8,7 @@ import TrainingCard from "@/components/trainings/TrainingCard";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Assignment = {
@@ -24,11 +24,12 @@ type Assignment = {
 };
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [trainings, setTrainings] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -47,11 +48,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     const loadTrainings = async () => {
-      if (!user) return;
+      if (!user || !session) return;
       
       try {
         setLoading(true);
         setError(null);
+        
+        console.log("Loading trainings for user:", user.id);
+        console.log("Session expires at:", new Date(session.expires_at * 1000).toLocaleString());
+        
         const data = await fetchAssignedTrainings(user.id);
         setTrainings(data);
       } catch (err: any) {
@@ -63,7 +68,11 @@ const Dashboard = () => {
     };
 
     loadTrainings();
-  }, [user]);
+  }, [user, session, retryCount]);
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
 
   // Stats calculations
   const totalTrainings = trainings.length;
@@ -84,7 +93,17 @@ const Dashboard = () => {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Erro</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="flex justify-between items-center">
+              <span>{error}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetry}
+                className="ml-2"
+              >
+                <RefreshCcw className="h-4 w-4 mr-1" /> Tentar Novamente
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
         
