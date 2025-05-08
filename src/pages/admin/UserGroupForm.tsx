@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -11,11 +10,6 @@ import { Loader } from "lucide-react";
 import { supabase, executeRPC } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
-
-interface UserWithCompany {
-  id: string;
-  company_id?: string;
-}
 
 const UserGroupForm = () => {
   const { id } = useParams();

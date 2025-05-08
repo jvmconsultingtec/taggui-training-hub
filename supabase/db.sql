@@ -49,3 +49,4 @@ BEGIN
   RETURN v_has_access;
 END;
 $$;
+
