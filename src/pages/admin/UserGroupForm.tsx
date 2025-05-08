@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader } from "lucide-react";
-import { supabase, executeRPC } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
@@ -27,31 +27,30 @@ const UserGroupForm = () => {
   useEffect(() => {
     // First fetch the user's company ID using RPC function to avoid recursion
     const fetchUserCompany = async () => {
-      if (user?.id) {
-        try {
-          console.log("Fetching company ID for user:", user.id);
-          
-          // Use get_current_user_company_id RPC function instead of direct query
-          const { data, error } = await supabase.rpc('get_current_user_company_id');
-          
-          if (error) {
-            throw error;
-          }
-          
-          console.log("Company ID retrieved:", data);
-          if (data) {
-            setCompanyId(data);
-          } else {
-            throw new Error("Company ID not found");
-          }
-        } catch (error) {
+      try {
+        console.log("Fetching company ID using RPC function");
+        
+        // Use get_current_user_company_id RPC function to avoid recursion
+        const { data, error } = await supabase.rpc('get_current_user_company_id');
+        
+        if (error) {
           console.error("Error fetching company ID:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível obter informações da empresa",
-            variant: "destructive",
-          });
+          throw error;
         }
+        
+        console.log("Company ID retrieved:", data);
+        if (data) {
+          setCompanyId(data);
+        } else {
+          throw new Error("Company ID not found");
+        }
+      } catch (error) {
+        console.error("Error fetching company ID:", error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível obter informações da empresa",
+          variant: "destructive",
+        });
       }
     };
     
@@ -125,7 +124,10 @@ const UserGroupForm = () => {
           })
           .eq("id", id);
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error updating group:", error);
+          throw error;
+        }
         
         toast({
           title: "Grupo atualizado",
@@ -144,7 +146,7 @@ const UserGroupForm = () => {
           .select();
           
         if (error) {
-          console.error("Error details:", error);
+          console.error("Error creating group:", error);
           throw error;
         }
         

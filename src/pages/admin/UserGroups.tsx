@@ -40,13 +40,16 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Buscar grupos (Não usa o policy "check_user_access" que causa recursão)
+      // Usando policies atualizadas que não causam recursão
       const { data: groupsData, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
         .order("name");
 
-      if (groupsError) throw groupsError;
+      if (groupsError) {
+        console.error("Error fetching groups:", groupsError);
+        throw groupsError;
+      }
 
       // Para cada grupo, buscar o número de membros
       const groupsWithMembersCount = await Promise.all(

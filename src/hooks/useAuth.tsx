@@ -77,8 +77,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       console.log("Checking admin status in useAuth");
       
-      // Chamada explícita à função 'is_admin' sem parâmetros
-      // Adicionamos um objeto vazio como parâmetro para evitar ambiguidade
+      // Usando a função is_admin sem parâmetros
       const { data, error } = await supabase.rpc('is_admin', {});
         
       if (error) {
