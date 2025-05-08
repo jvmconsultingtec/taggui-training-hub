@@ -110,6 +110,7 @@ export type Database = {
       }
       trainings: {
         Row: {
+          author: string | null
           company_id: string
           created_at: string | null
           description: string | null
@@ -122,6 +123,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["visibility"] | null
         }
         Insert: {
+          author?: string | null
           company_id: string
           created_at?: string | null
           description?: string | null
@@ -134,6 +136,7 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["visibility"] | null
         }
         Update: {
+          author?: string | null
           company_id?: string
           created_at?: string | null
           description?: string | null

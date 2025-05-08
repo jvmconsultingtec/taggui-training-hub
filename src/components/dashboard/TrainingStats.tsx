@@ -1,4 +1,3 @@
-
 import {
   Card,
   CardContent,
@@ -16,10 +15,15 @@ interface StatsProps {
 }
 
 export function TrainingStats({ total, completed, inProgress, overdue = 0 }: StatsProps) {
-  // Ensure total is accurate and consistent
-  const realTotal = Math.max(total, completed + inProgress + overdue);
+  // Calculate accurate total based on the sum of other values
+  const calculatedTotal = completed + inProgress + overdue;
   
-  const completionPercentage = realTotal > 0 ? (completed / realTotal) * 100 : 0;
+  // Use the provided total if it's greater than or equal to the calculated total
+  // Otherwise use the calculated total to ensure consistency
+  const actualTotal = Math.max(total, calculatedTotal);
+  
+  // Calculate completion percentage based on actual total
+  const completionPercentage = actualTotal > 0 ? (completed / actualTotal) * 100 : 0;
 
   return (
     <Card>
@@ -52,7 +56,7 @@ export function TrainingStats({ total, completed, inProgress, overdue = 0 }: Sta
             </div>
           ) : (
             <div className="space-y-1 text-center p-2 bg-gray-50 rounded-lg">
-              <span className="text-xl font-semibold">{realTotal}</span>
+              <span className="text-xl font-semibold">{actualTotal}</span>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
           )}

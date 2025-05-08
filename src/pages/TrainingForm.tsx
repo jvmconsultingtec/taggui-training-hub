@@ -1,287 +1,254 @@
-
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import Layout from "@/components/layout/Layout";
-import { useAuth } from "@/hooks/useAuth";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { fetchTrainingById, createTraining, updateTraining, uploadTrainingVideo } from "@/services/api";
-import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Upload, Loader, Plus, X } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
-import { Database } from "@/integrations/supabase/types";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useParams } from "react-router-dom";
+import { Loader2, Upload, X, Plus } from "lucide-react";
+import Layout from "../components/layout/Layout";
+import { createTraining, fetchTrainingById, updateTraining, uploadTrainingVideo } from "../services/api";
+import { toast } from "../hooks/use-toast";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 
-// Define the VideoType type from the Database types
-type VideoType = Database["public"]["Enums"]["video_type"];
-type Visibility = Database["public"]["Enums"]["visibility"];
+// Helper function to convert duration to minutes
+const durationToMinutes = (duration: string): number => {
+  // Handle empty cases
+  if (!duration) return 0;
+  
+  // If already a number, return it
+  if (!isNaN(Number(duration))) {
+    return Math.max(0, Math.round(Number(duration)));
+  }
+
+  // Try to parse it as MM:SS format
+  const parts = duration.split(':');
+  if (parts.length === 2) {
+    const minutes = parseInt(parts[0], 10);
+    const seconds = parseInt(parts[1], 10);
+    if (!isNaN(minutes) && !isNaN(seconds)) {
+      return Math.round(minutes + (seconds / 60));
+    }
+  }
+  
+  return 0;
+};
 
 const TrainingForm = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const { user } = useAuth();
-  const isEditMode = Boolean(id);
-  
-  // State to hold the company ID
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [fetchingCompanyId, setFetchingCompanyId] = useState(true);
-
-  // State to hold the form data
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    videoType: "YOUTUBE" as VideoType,
-    videoUrl: "",
-    durationMin: "10",
-    tag: "",
-    visibility: "PUBLIC" as Visibility
-  });
-  
-  // Tags state
-  const [tags, setTags] = useState<string[]>([]);
-  
-  // File state
-  const [file, setFile] = useState<File | null>(null);
-  
-  // Loading states
-  const [loading, setLoading] = useState(isEditMode);
+  const { id } = useParams<{ id: string }>();
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Form fields
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [author, setAuthor] = useState("");
+  const [videoType, setVideoType] = useState<"YOUTUBE" | "UPLOAD">("YOUTUBE");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [duration, setDuration] = useState(""); // User input in MM:SS or minutes format
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState("");
+  
+  // File upload state
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Get company ID directly from user auth metadata
   useEffect(() => {
-    const getCompanyId = async () => {
-      try {
-        setFetchingCompanyId(true);
-        setError(null);
-        
-        if (!user) {
-          setError("User not authenticated. Please login again.");
-          setFetchingCompanyId(false);
-          return;
-        }
+    // If we have an ID, fetch the training to edit
+    if (id) {
+      loadTraining(id);
+    }
+  }, [id]);
 
-        // Get current user
-        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !currentUser) {
-          console.error("Auth error:", authError);
-          setError("Authentication error. Please login again.");
-          setFetchingCompanyId(false);
-          return;
-        }
-
-        // Get user profile from users table
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('company_id')
-          .eq('id', currentUser.id)
-          .single();
-        
-        if (userError) {
-          console.error("Error fetching user data:", userError);
-          
-          // Fallback to user metadata
-          if (currentUser.user_metadata?.company_id) {
-            console.log("Using company ID from user metadata:", currentUser.user_metadata.company_id);
-            setCompanyId(currentUser.user_metadata.company_id);
-            setFetchingCompanyId(false);
-            return;
-          }
-          
-          setError("Could not get company ID. Please contact support.");
-          setFetchingCompanyId(false);
-          return;
-        }
-        
-        if (!userData || !userData.company_id) {
-          setError("User is not associated with any company.");
-          setFetchingCompanyId(false);
-          return;
-        }
-        
-        console.log("Company ID found:", userData.company_id);
-        setCompanyId(userData.company_id);
-        setFetchingCompanyId(false);
-      } catch (err: any) {
-        console.error("Error in getCompanyId:", err);
-        setError("Error: " + (err.message || "Unknown error"));
-        setFetchingCompanyId(false);
-      }
-    };
-    
-    getCompanyId();
-  }, [user]);
-  
-  // Fetch training if in edit mode
-  useEffect(() => {
-    if (isEditMode && id) {
-      const getTraining = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          
-          const training = await fetchTrainingById(id);
-          
-          if (training) {
-            setFormData({
-              title: training.title || "",
-              description: training.description || "",
-              videoType: training.video_type as VideoType || "YOUTUBE",
-              videoUrl: training.video_url || "",
-              durationMin: String(training.duration_min) || "10",
-              tag: "",
-              visibility: training.visibility as Visibility || "PUBLIC"
-            });
-            
-            if (training.tags && Array.isArray(training.tags)) {
-              setTags(training.tags);
-            }
-          } else {
-            setError("Training not found");
-          }
-        } catch (err: any) {
-          console.error("Error fetching training:", err);
-          setError(`Error loading training: ${err.message || "Unknown error"}`);
-        } finally {
-          setLoading(false);
-        }
-      };
+  const loadTraining = async (trainingId: string) => {
+    try {
+      setLoading(true);
+      const training = await fetchTrainingById(trainingId);
       
-      getTraining();
+      if (!training) {
+        toast({
+          title: "Erro",
+          description: "Treinamento não encontrado",
+          variant: "destructive"
+        });
+        navigate("/trainings");
+        return;
+      }
+      
+      // Populate form fields
+      setTitle(training.title);
+      setDescription(training.description || "");
+      setAuthor(training.author || "");
+      setVideoType(training.video_type);
+      setVideoUrl(training.video_url);
+      setDuration(training.duration_min.toString());
+      setTags(training.tags || []);
+      
+    } catch (error) {
+      console.error("Error loading training:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar o treinamento",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [id, isEditMode]);
-  
-  // Handle text field changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
-  // Add tag to list
+
   const handleAddTag = () => {
-    if (formData.tag.trim() && !tags.includes(formData.tag.trim())) {
-      setTags(prev => [...prev, formData.tag.trim()]);
-      setFormData(prev => ({ ...prev, tag: "" }));
+    if (newTag.trim() && !tags.includes(newTag.trim())) {
+      setTags([...tags, newTag.trim()]);
+      setNewTag("");
     }
   };
-  
-  // Remove tag from list
+
   const handleRemoveTag = (tagToRemove: string) => {
-    setTags(prev => prev.filter(tag => tag !== tagToRemove));
+    setTags(tags.filter(tag => tag !== tagToRemove));
   };
-  
-  // Handle radio button changes
-  const handleRadioChange = (value: string) => {
-    setFormData(prev => ({ ...prev, videoType: value as VideoType }));
-    if (value === "YOUTUBE") {
-      setFile(null);
-    }
-  };
-  
-  // Handle visibility change
-  const handleVisibilityChange = (value: string) => {
-    setFormData(prev => ({ ...prev, visibility: value as Visibility }));
-  };
-  
-  // Handle file changes
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      // Validate file type
+      const selectedFile = e.target.files[0];
+      const fileType = selectedFile.type;
+      
+      if (!fileType.startsWith('video/')) {
+        toast({
+          title: "Erro",
+          description: "Por favor, selecione um arquivo de vídeo válido",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setFile(selectedFile);
+      
+      // Extract duration if possible (only works in modern browsers)
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = function() {
+        window.URL.revokeObjectURL(video.src);
+        const durationInMinutes = Math.round(video.duration / 60);
+        setDuration(durationInMinutes.toString());
+      };
+      
+      video.src = URL.createObjectURL(selectedFile);
     }
   };
-  
-  // Handle form submission
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!title.trim()) {
+      toast({
+        title: "Erro",
+        description: "O título é obrigatório",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (videoType === "YOUTUBE" && !videoUrl.trim()) {
+      toast({
+        title: "Erro",
+        description: "A URL do vídeo é obrigatória",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (videoType === "UPLOAD" && !file && !videoUrl) {
+      toast({
+        title: "Erro",
+        description: "É necessário fazer upload de um vídeo",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       setSubmitting(true);
-      setError(null);
-      setUploadProgress(0);
       
-      if (!user) {
-        throw new Error("User not authenticated. Please login again.");
-      }
+      let finalVideoUrl = videoUrl;
       
-      if (!companyId) {
-        throw new Error("Company ID not available. Please try refreshing the page.");
-      }
-      
-      // Validate form
-      if (!formData.title) {
-        throw new Error("Title is required");
-      }
-      
-      if (formData.videoType === "YOUTUBE" && !formData.videoUrl) {
-        throw new Error("YouTube URL is required");
-      }
-      
-      if (formData.videoType === "UPLOAD" && !file && !isEditMode) {
-        throw new Error("You must upload a video");
-      }
-      
-      // Upload file if needed
-      let videoUrl = formData.videoUrl;
-      if (file && formData.videoType === "UPLOAD") {
+      // If we have a file to upload, do that first
+      if (file) {
+        setUploading(true);
+        
         try {
-          // Update progress
+          // Start a simulated progress
+          let progress = 0;
           const progressInterval = setInterval(() => {
-            setUploadProgress(prev => Math.min(prev + 10, 90));
-          }, 500);
+            progress += 5;
+            if (progress > 95) {
+              clearInterval(progressInterval);
+            }
+            setUploadProgress(progress);
+          }, 300);
           
-          videoUrl = await uploadTrainingVideo(file);
+          finalVideoUrl = await uploadTrainingVideo(file);
+          
           clearInterval(progressInterval);
           setUploadProgress(100);
-        } catch (err: any) {
-          throw new Error(`Error uploading video: ${err.message || "Unknown error"}`);
+          
+          toast({
+            title: "Sucesso",
+            description: "Vídeo enviado com sucesso"
+          });
+        } catch (error) {
+          console.error("Error uploading video:", error);
+          toast({
+            title: "Erro no upload",
+            description: "Não foi possível fazer upload do vídeo",
+            variant: "destructive"
+          });
+          return;
+        } finally {
+          setUploading(false);
         }
       }
       
-      // Prepare training data
+      // Convert duration to minutes
+      const durationMinutes = durationToMinutes(duration);
+      
+      // Create or update the training
       const trainingData = {
-        title: formData.title,
-        description: formData.description,
-        video_type: formData.videoType,
-        video_url: videoUrl,
-        duration_min: parseInt(formData.durationMin, 10) || 10,
-        tags: tags,
-        company_id: companyId,
-        visibility: formData.visibility
+        title,
+        description: description.trim() || null,
+        author: author.trim() || null,
+        video_type: videoType,
+        video_url: finalVideoUrl,
+        duration_min: durationMinutes,
+        tags: tags.length > 0 ? tags : null,
+        company_id: "00000000-0000-0000-0000-000000000000" // Default company ID
       };
       
-      console.log("Submitting training data:", trainingData);
-      
-      // Create or update training
-      if (isEditMode && id) {
+      if (id) {
+        // Update existing training
         await updateTraining(id, trainingData);
         toast({
-          title: "Training updated",
-          description: "The training was updated successfully"
+          title: "Treinamento atualizado",
+          description: "O treinamento foi atualizado com sucesso"
         });
       } else {
-        await createTraining(trainingData);
+        // Create new training
+        const newTraining = await createTraining(trainingData);
         toast({
-          title: "Training created",
-          description: "The training was created successfully"
+          title: "Treinamento criado",
+          description: "O treinamento foi criado com sucesso"
         });
       }
       
-      // Navigate back
+      // Navigate back to trainings list
       navigate("/trainings");
       
-    } catch (err: any) {
-      console.error("Error submitting training:", err);
-      setError(`Error: ${err.message || "Unknown error"}`);
+    } catch (error) {
+      console.error("Error saving training:", error);
       toast({
-        title: "Error",
-        description: err.message || "An error occurred while saving the training",
+        title: "Erro",
+        description: "Não foi possível salvar o treinamento",
         variant: "destructive"
       });
     } finally {
@@ -289,15 +256,12 @@ const TrainingForm = () => {
     }
   };
 
-  // Show loading state during fetch
-  if (fetchingCompanyId) {
+  if (loading) {
     return (
       <Layout>
-        <div className="container mx-auto py-6">
-          <div className="flex justify-center py-12">
-            <Loader className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-2">Loading company information...</p>
-          </div>
+        <div className="container mx-auto py-6 flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 text-taggui-primary animate-spin" />
+          <span className="ml-2 text-lg">Carregando...</span>
         </div>
       </Layout>
     );
@@ -306,228 +270,302 @@ const TrainingForm = () => {
   return (
     <Layout>
       <div className="container mx-auto py-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate(-1)} 
-            className="p-0 h-8 w-8"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">
-              {isEditMode ? "Edit Training" : "New Training"}
-            </h1>
-            <p className="text-muted-foreground">
-              {isEditMode 
-                ? "Update the training information" 
-                : "Create a new training for your team"
-              }
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          {id ? "Editar Treinamento" : "Novo Treinamento"}
+        </h1>
         
-        {/* Content */}
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : error ? (
-          <Alert variant="destructive" className="mb-6">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-            <div className="mt-4">
-              <Button onClick={() => navigate('/dashboard')} variant="outline">
-                Go back to Dashboard
-              </Button>
-            </div>
-          </Alert>
-        ) : (
-          <Card>
-            <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Title */}
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <Input 
-                    id="title"
-                    name="title"
-                    placeholder="Training title" 
-                    value={formData.title}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea 
-                    id="description"
-                    name="description"
-                    placeholder="Describe the training"
-                    rows={4}
-                    value={formData.description}
-                    onChange={handleChange}
-                  />
-                </div>
-                
-                {/* Video Type */}
-                <div className="space-y-2">
-                  <Label>Video Type</Label>
-                  <RadioGroup 
-                    value={formData.videoType}
-                    onValueChange={handleRadioChange}
-                    className="flex flex-col space-y-1"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="YOUTUBE" id="video-youtube" />
-                      <Label htmlFor="video-youtube">YouTube</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="UPLOAD" id="video-upload" />
-                      <Label htmlFor="video-upload">File upload</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
-                {/* YouTube URL or File Upload based on selected type */}
-                {formData.videoType === "YOUTUBE" ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="videoUrl">YouTube URL</Label>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações do Treinamento</CardTitle>
+                <CardDescription>Preencha os detalhes do treinamento</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                      Título
+                    </label>
                     <Input 
-                      id="videoUrl"
-                      name="videoUrl"
-                      placeholder="https://youtube.com/watch?v=..." 
-                      value={formData.videoUrl}
-                      onChange={handleChange}
-                      required={formData.videoType === "YOUTUBE"}
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Digite o título do treinamento"
+                      required
                     />
-                    <p className="text-sm text-muted-foreground">
-                      Paste the complete YouTube video URL
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                      Descrição
+                    </label>
+                    <Textarea 
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Descreva o conteúdo do treinamento (opcional)"
+                      rows={4}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-1">
+                      Autor
+                    </label>
+                    <Input 
+                      id="author"
+                      value={author}
+                      onChange={(e) => setAuthor(e.target.value)}
+                      placeholder="Digite o nome do autor ou departamento"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tipo de Vídeo
+                    </label>
+                    <div className="flex space-x-4">
+                      <label className="flex items-center">
+                        <input 
+                          type="radio" 
+                          value="YOUTUBE" 
+                          checked={videoType === "YOUTUBE"}
+                          onChange={() => setVideoType("YOUTUBE")}
+                          className="mr-2"
+                        />
+                        <span>Link do YouTube</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input 
+                          type="radio" 
+                          value="UPLOAD" 
+                          checked={videoType === "UPLOAD"}
+                          onChange={() => setVideoType("UPLOAD")}
+                          className="mr-2"
+                        />
+                        <span>Fazer upload</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {videoType === "YOUTUBE" ? (
+                    <div>
+                      <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700 mb-1">
+                        URL do Vídeo
+                      </label>
+                      <Input 
+                        id="videoUrl"
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
+                        placeholder="Cole o link do vídeo do YouTube"
+                        required={videoType === "YOUTUBE"}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="videoFile" className="block text-sm font-medium text-gray-700 mb-1">
+                        Arquivo de Vídeo
+                      </label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-md p-6">
+                        <div className="flex flex-col items-center">
+                          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-500 mb-4">
+                            Arraste e solte ou clique para selecionar um vídeo
+                          </p>
+                          <input
+                            id="videoFile"
+                            type="file"
+                            accept="video/*"
+                            onChange={handleFileChange}
+                            className="hidden"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => document.getElementById("videoFile")?.click()}
+                            disabled={uploading}
+                          >
+                            Selecionar Vídeo
+                          </Button>
+                          
+                          {file && (
+                            <div className="mt-4 w-full">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
+                                  {file.name}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setFile(null)}
+                                  className="text-gray-500 hover:text-gray-700"
+                                  disabled={uploading}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                              
+                              {uploading && (
+                                <div className="mt-2">
+                                  <div className="h-2 bg-gray-200 rounded-full mt-1">
+                                    <div
+                                      className="h-2 bg-taggui-primary rounded-full"
+                                      style={{ width: `${uploadProgress}%` }}
+                                    />
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {uploadProgress}% enviado...
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-1">
+                      Duração (minutos)
+                    </label>
+                    <Input 
+                      id="duration"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      placeholder="10"
+                      type="text"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Digite o número de minutos ou no formato MM:SS
                     </p>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="videoFile">Video file</Label>
-                    <div className="flex items-center space-x-2">
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    <div className="flex items-center">
                       <Input 
-                        id="videoFile"
-                        type="file"
-                        accept="video/*"
-                        onChange={handleFileChange}
-                        className={isEditMode ? "w-3/4" : "w-full"}
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        placeholder="Adicionar tag"
+                        className="flex-grow"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddTag();
+                          }
+                        }}
                       />
-                      {isEditMode && (
-                        <div className="text-sm text-muted-foreground">
-                          {file ? file.name : "Keep current video"}
+                      <Button
+                        type="button"
+                        onClick={handleAddTag}
+                        className="ml-2"
+                        variant="outline"
+                        disabled={!newTag.trim()}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {tags.map((tag, index) => (
+                        <div 
+                          key={index}
+                          className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center"
+                        >
+                          {tag}
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="ml-2 text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </div>
+                      ))}
+                      {tags.length === 0 && (
+                        <p className="text-sm text-gray-500">Nenhuma tag adicionada</p>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Accepted formats: MP4, WebM. Maximum size: 100MB.
-                    </p>
-                    
-                    {uploadProgress > 0 && (
-                      <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-2">
-                        <div 
-                          className="bg-primary h-2.5 rounded-full" 
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                    )}
                   </div>
-                )}
-                
-                {/* Duration */}
-                <div className="space-y-2">
-                  <Label htmlFor="durationMin">Duration (minutes)</Label>
-                  <Input 
-                    id="durationMin"
-                    name="durationMin"
-                    type="number"
-                    min="1"
-                    value={formData.durationMin}
-                    onChange={handleChange}
-                    className="max-w-[200px]"
-                  />
-                </div>
-                
-                {/* Tags */}
-                <div className="space-y-2">
-                  <Label htmlFor="tag">Tags</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="text-sm py-1 px-3">
-                        {tag}
-                        <button 
-                          type="button" 
-                          onClick={() => handleRemoveTag(tag)} 
-                          className="ml-2 text-muted-foreground hover:text-foreground"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Input 
-                      id="tag"
-                      name="tag"
-                      placeholder="Add tag" 
-                      value={formData.tag}
-                      onChange={handleChange}
-                      className="flex-1"
-                    />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleAddTag}
-                      disabled={!formData.tag.trim()}
+                  
+                  <div className="pt-4 flex justify-end space-x-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate("/trainings")}
+                      disabled={submitting}
                     >
-                      <Plus className="h-4 w-4 mr-1" /> Add
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit"
+                      disabled={submitting || uploading}
+                    >
+                      {submitting ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</>
+                      ) : (
+                        id ? "Atualizar" : "Criar"
+                      )}
                     </Button>
                   </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Dicas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 text-sm">
+                  <div>
+                    <h3 className="font-semibold mb-1">Título</h3>
+                    <p className="text-gray-600">
+                      Use um título claro e objetivo que descreva o conteúdo do treinamento.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-semibold mb-1">Descrição</h3>
+                    <p className="text-gray-600">
+                      Forneça uma descrição detalhada para que os colaboradores saibam o que esperar do treinamento.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-semibold mb-1">Autor</h3>
+                    <p className="text-gray-600">
+                      Indique quem criou o treinamento ou qual departamento é responsável por ele.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-semibold mb-1">Vídeos</h3>
+                    <p className="text-gray-600">
+                      Para links do YouTube, certifique-se de que o vídeo não está privado ou restrito. Para uploads, recomendamos vídeos com até 500MB.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-semibold mb-1">Tags</h3>
+                    <p className="text-gray-600">
+                      Adicione tags relevantes para facilitar a busca e categorização dos treinamentos.
+                    </p>
+                  </div>
                 </div>
-                
-                {/* Visibility */}
-                <div className="space-y-2">
-                  <Label>Visibility</Label>
-                  <RadioGroup 
-                    value={formData.visibility}
-                    onValueChange={handleVisibilityChange}
-                    className="flex flex-col space-y-1"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="PUBLIC" id="visibility-public" />
-                      <Label htmlFor="visibility-public">Public (all team members)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="PRIVATE" id="visibility-private" />
-                      <Label htmlFor="visibility-private">Private (selected team members only)</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
-                {/* Submit buttons */}
-                <div className="flex items-center justify-end gap-2 pt-4">
-                  <Link to="/trainings">
-                    <Button type="button" variant="outline">
-                      Cancel
-                    </Button>
-                  </Link>
-                  <Button type="submit" disabled={submitting || !companyId}>
-                    {submitting && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-                    {isEditMode ? "Save changes" : "Create training"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </Layout>
   );
