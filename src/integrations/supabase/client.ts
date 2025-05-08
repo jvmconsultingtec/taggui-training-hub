@@ -61,3 +61,23 @@ export const refreshData = async <T>(callback: () => Promise<T>): Promise<T> => 
     throw error;
   }
 };
+
+// Execute an RPC function that returns data rather than querying tables directly
+// This helps avoid RLS recursion issues with policies that reference the same table
+export const executeRPC = async <T>(functionName: string, params?: Record<string, any>): Promise<T[]> => {
+  try {
+    console.log(`Executing RPC function: ${functionName}`, params);
+    
+    const { data, error } = await supabase.rpc<T>(functionName, params || {});
+    
+    if (error) {
+      console.error(`Error executing RPC ${functionName}:`, error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error(`Exception in RPC ${functionName}:`, error);
+    throw error;
+  }
+};
