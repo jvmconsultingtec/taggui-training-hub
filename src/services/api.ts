@@ -266,15 +266,60 @@ export const updateTraining = async (id: string, updates: Partial<Training>) => 
 
 export const deleteTraining = async (id: string) => {
   try {
+    // First, check if the training exists
+    const { data: training, error: fetchError } = await supabase
+      .from("trainings")
+      .select("*")
+      .eq("id", id)
+      .single();
+      
+    if (fetchError) {
+      throw fetchError;
+    }
+    
+    if (!training) {
+      throw new Error("Treinamento não encontrado");
+    }
+    
+    // Delete any progress records associated with this training
+    const { error: progressDeleteError } = await supabase
+      .from("training_progress")
+      .delete()
+      .eq("training_id", id);
+      
+    if (progressDeleteError) {
+      console.error("Error deleting associated progress:", progressDeleteError);
+      // Continue with deletion even if progress removal fails
+    }
+    
+    // Delete any assignments associated with this training
+    const { error: assignmentDeleteError } = await supabase
+      .from("training_assignments")
+      .delete()
+      .eq("training_id", id);
+      
+    if (assignmentDeleteError) {
+      console.error("Error deleting associated assignments:", assignmentDeleteError);
+      // Continue with deletion even if assignment removal fails
+    }
+    
+    // Delete the training itself
     const { error } = await supabase
       .from("trainings")
       .delete()
       .eq("id", id);
     
     if (error) throw error;
+    
+    toast({
+      title: "Treinamento excluído",
+      description: "O treinamento foi excluído com sucesso",
+    });
+    
+    return true;
   } catch (error) {
     handleError(error, "Error deleting training:");
-    throw error;
+    return false;
   }
 };
 
@@ -346,6 +391,30 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
       .maybeSingle();
     
     if (error) throw error;
+    
+    // If no progress record exists, create an initial one with zero progress
+    if (!data) {
+      try {
+        console.log("No progress record found, creating initial record");
+        const { data: newProgress, error: createError } = await supabase
+          .from("training_progress")
+          .insert({
+            training_id: trainingId,
+            user_id: userId,
+            progress_pct: 0,
+            last_viewed_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        return newProgress;
+      } catch (createErr) {
+        console.error("Error creating initial progress record:", createErr);
+        return null;
+      }
+    }
+    
     return data;
   } catch (error) {
     handleError(error, "Error fetching training progress:");
@@ -355,6 +424,8 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
 
 export const updateTrainingProgress = async (trainingId: string, userId: string, progressPct: number, completed: boolean = false) => {
   try {
+    console.log(`Updating progress for training ${trainingId}, user ${userId} to ${progressPct}%, completed: ${completed}`);
+    
     // Check if progress record exists
     const { data: existingProgress, error: checkError } = await supabase
       .from("training_progress")
@@ -384,33 +455,24 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
       updates.completed_at = null;
     }
     
-    if (existingProgress) {
-      // Update existing record
-      const { data, error } = await supabase
-        .from("training_progress")
-        .update(updates)
-        .eq("id", existingProgress.id)
-        .select();
-      
-      if (error) throw error;
-      return data;
-    } else {
-      // Create new record - use upsert instead of insert to prevent duplicate key errors
-      const { data, error } = await supabase
-        .from("training_progress")
-        .upsert({
-          training_id: trainingId,
-          user_id: userId,
-          ...updates
-        })
-        .select();
-      
-      if (error) {
-        console.error("Error upserting training progress:", error);
-        throw error;
-      }
-      return data;
+    // Use upsert to update or create the progress record
+    const { data, error } = await supabase
+      .from("training_progress")
+      .upsert({
+        id: existingProgress?.id || undefined,
+        training_id: trainingId,
+        user_id: userId,
+        ...updates
+      })
+      .select();
+    
+    if (error) {
+      console.error("Error upserting training progress:", error);
+      throw error;
     }
+    
+    console.log("Progress updated successfully:", data);
+    return data;
   } catch (error) {
     handleError(error, "Error updating training progress:");
     throw error;

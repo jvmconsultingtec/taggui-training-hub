@@ -24,6 +24,7 @@ const TrainingDetail = () => {
   const [status, setStatus] = useState<TrainingStatusType>("not_started");
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(false);
+  const [statusChanging, setStatusChanging] = useState(false);
 
   useEffect(() => {
     const loadTraining = async () => {
@@ -45,10 +46,6 @@ const TrainingDetail = () => {
         setError(null);
         console.log("Loading training with ID:", id, "User ID:", user.id);
         
-        // Check if session is valid
-        console.log("Current session expires at:", new Date(session?.expires_at || 0).toLocaleString());
-        console.log("Current time:", new Date().toLocaleString());
-        
         const trainingData = await fetchTrainingById(id);
         
         if (!trainingData) {
@@ -62,26 +59,27 @@ const TrainingDetail = () => {
         setTraining(trainingData);
         
         setLoadingProgress(true);
-        // Try to load progress if it exists
+        // Load or create progress record
         try {
           console.log("Fetching training progress for training:", id, "and user:", user.id);
           const progressData = await fetchTrainingProgress(id, user.id);
           console.log("Progress data received:", progressData);
           
           if (progressData) {
-            console.log("Progress data loaded:", progressData.progress_pct, "Status:", 
-              progressData.completed_at ? "completed" : progressData.progress_pct > 0 ? "in_progress" : "not_started");
+            console.log("Progress data loaded:", progressData.progress_pct, "Completed:", !!progressData.completed_at);
             
             setProgress(progressData.progress_pct || 0);
             
             // Determine status based on progress
+            let currentStatus: TrainingStatusType = "not_started";
             if (progressData.completed_at) {
-              setStatus("completed");
+              currentStatus = "completed";
             } else if (progressData.progress_pct > 0) {
-              setStatus("in_progress");
-            } else {
-              setStatus("not_started");
+              currentStatus = "in_progress";
             }
+            
+            setStatus(currentStatus);
+            console.log("Set initial status to:", currentStatus);
           } else {
             console.log("No progress data found, initializing with not_started status");
             setStatus("not_started");
@@ -89,7 +87,6 @@ const TrainingDetail = () => {
           }
         } catch (error) {
           console.error("Error loading progress:", error);
-          console.log("No progress data found, initializing with not_started status");
           setStatus("not_started");
           setProgress(0);
         } finally {
@@ -120,7 +117,7 @@ const TrainingDetail = () => {
       
       // Update status based on progress
       let newStatus = status;
-      if (progressPercent >= 100) {
+      if (progressPercent >= 100 && status !== "completed") {
         newStatus = "completed";
         setStatus(newStatus);
       } else if (progressPercent > 0 && status === "not_started") {
@@ -128,11 +125,10 @@ const TrainingDetail = () => {
         setStatus(newStatus);
       }
       
-      console.log(`Attempting to update progress to ${progressPercent}% with status ${newStatus}`);
+      console.log(`Updating progress to ${progressPercent}% with status ${newStatus}`);
       
       // Send to API with current status
       await updateTrainingProgress(id, user.id, progressPercent, newStatus === "completed");
-      console.log(`Progress updated to ${progressPercent}% with status ${newStatus}`);
     } catch (error) {
       console.error("Error updating progress:", error);
     }
@@ -142,16 +138,17 @@ const TrainingDetail = () => {
     if (!id || !user) return;
     
     try {
+      setStatusChanging(true);
       console.log(`Changing status from ${status} to ${newStatus}`);
-      setStatus(newStatus);
       
       // For completed status, set progress to 100%
       const newProgress = newStatus === "completed" ? 100 : progress;
+      
+      // Update local state first for responsive UI
+      setStatus(newStatus);
       if (newStatus === "completed" && progress < 100) {
         setProgress(100);
       }
-      
-      console.log(`Sending update: status=${newStatus}, progress=${newProgress}%`);
       
       // Send to API
       await updateTrainingProgress(
@@ -176,6 +173,22 @@ const TrainingDetail = () => {
         description: "Não foi possível atualizar o status",
         variant: "destructive"
       });
+      
+      // Revert status changes on error
+      const progressData = await fetchTrainingProgress(id, user.id);
+      if (progressData) {
+        let revertStatus: TrainingStatusType = "not_started";
+        if (progressData.completed_at) {
+          revertStatus = "completed";
+        } else if (progressData.progress_pct > 0) {
+          revertStatus = "in_progress";
+        }
+        
+        setStatus(revertStatus);
+        setProgress(progressData.progress_pct || 0);
+      }
+    } finally {
+      setStatusChanging(false);
     }
   };
 
@@ -316,9 +329,9 @@ const TrainingDetail = () => {
               <div>
                 <h3 className="text-lg font-medium">Tags</h3>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {training.tags.map((tag: string) => (
+                  {training.tags.map((tag: string, index: number) => (
                     <span 
-                      key={tag} 
+                      key={index} 
                       className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs"
                     >
                       {tag}
@@ -347,15 +360,17 @@ const TrainingDetail = () => {
                         <button
                           key={statusOption.value}
                           onClick={() => handleStatusChange(statusOption.value)}
+                          disabled={statusChanging || status === statusOption.value}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                             status === statusOption.value
                               ? getStatusColor(statusOption.value)
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
+                          } ${statusChanging ? "opacity-50 cursor-not-allowed" : ""}`}
                           aria-pressed={status === statusOption.value}
                           type="button"
                         >
                           {statusOption.label}
+                          {status === statusOption.value && <span className="ml-1">✓</span>}
                         </button>
                       ))}
                     </div>

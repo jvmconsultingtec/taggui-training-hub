@@ -22,6 +22,7 @@ type TrainingWithProgress = {
   progress_pct: number;
   status: TrainingStatus;
   last_viewed_at?: string;
+  tags: string[] | null;
 };
 
 const statusIcons = {
@@ -46,8 +47,20 @@ const ProgressPage = () => {
         setError(null);
         const assignments = await fetchAssignedTrainings(user.id);
         
+        if (!assignments || assignments.length === 0) {
+          setLoading(false);
+          return;
+        }
+        
         const trainingWithProgressPromises = assignments.map(async (assignment) => {
-          const progress = await fetchTrainingProgress(assignment.training.id, user.id);
+          const training = assignment.training;
+          
+          if (!training) {
+            console.error("Training data missing in assignment:", assignment);
+            return null;
+          }
+          
+          const progress = await fetchTrainingProgress(training.id, user.id);
           
           // Determine status
           let status: TrainingStatus = "not_started";
@@ -58,17 +71,18 @@ const ProgressPage = () => {
           }
           
           return {
-            id: assignment.training.id,
-            title: assignment.training.title,
-            description: assignment.training.description,
-            duration_min: assignment.training.duration_min,
+            id: training.id,
+            title: training.title,
+            description: training.description,
+            duration_min: training.duration_min,
             progress_pct: progress?.progress_pct || 0,
             status: status,
             last_viewed_at: progress?.last_viewed_at,
+            tags: training.tags,
           };
         });
         
-        const trainingWithProgress = await Promise.all(trainingWithProgressPromises);
+        const trainingWithProgress = (await Promise.all(trainingWithProgressPromises)).filter(Boolean) as TrainingWithProgress[];
         setTrainings(trainingWithProgress);
       } catch (err: any) {
         console.error("Erro ao carregar progresso dos treinamentos:", err);
@@ -170,13 +184,26 @@ const ProgressPage = () => {
                       </div>
                     )}
                     
-                    <div className="flex justify-between items-center text-xs text-muted-foreground">
-                      <span>Duração: {training.duration_min} minutos</span>
-                      {training.last_viewed_at && (
-                        <span>
-                          Última visualização:{" "}
-                          {new Date(training.last_viewed_at).toLocaleDateString("pt-BR")}
-                        </span>
+                    <div className="flex justify-between flex-wrap items-center text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4">
+                        <span>Duração: {training.duration_min} minutos</span>
+                        {training.last_viewed_at && (
+                          <span>
+                            Última visualização:{" "}
+                            {new Date(training.last_viewed_at).toLocaleDateString("pt-BR")}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Display tags */}
+                      {training.tags && training.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {training.tags.map((tag, i) => (
+                            <span key={i} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                     <Separator className="my-2" />
