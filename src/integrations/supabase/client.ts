@@ -13,9 +13,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: typeof window !== 'undefined' ? localStorage : undefined
   },
   global: {
-    // Headers personalizados para requisições ao Storage
+    // Cabeçalhos para garantir que conteúdo não seja cacheado
     headers: {
-      // Desativar cache para garantir que o conteúdo mais recente seja carregado
       'cache-control': 'no-cache, no-store, must-revalidate',
       'pragma': 'no-cache',
       'expires': '0'

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -54,6 +55,7 @@ export const ensureTrainingVideosBucket = async () => {
     
     console.log("Available buckets:", buckets);
     
+    // Note: The bucket might be named 'training_videos' in the database but 'training-videos' in URLs
     const bucketExists = buckets?.some(bucket => bucket.name === 'training_videos');
     
     if (!bucketExists) {
@@ -413,10 +415,9 @@ export const uploadTrainingVideo = async (file: File) => {
     await ensureTrainingVideosBucket();
     
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const fileName = `uploads/${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     
-    console.log("Upload path:", filePath, "File size:", file.size);
+    console.log("Upload path:", fileName, "File size:", file.size);
     
     // For large files, use a chunked upload approach
     if (file.size > 5 * 1024 * 1024) { // For files larger than 5MB
@@ -437,7 +438,7 @@ export const uploadTrainingVideo = async (file: File) => {
         
         const { error: uploadError } = await supabase.storage
           .from('training_videos')
-          .upload(filePath, chunk, uploadOptions);
+          .upload(fileName, chunk, uploadOptions);
           
         if (uploadError) {
           console.error(`Error uploading chunk ${i+1}:`, uploadError);
@@ -453,7 +454,7 @@ export const uploadTrainingVideo = async (file: File) => {
       // For smaller files, use standard upload
       const { data, error } = await supabase.storage
         .from('training_videos')
-        .upload(filePath, file);
+        .upload(fileName, file);
       
       if (error) {
         console.error("Upload error:", error);
@@ -463,13 +464,20 @@ export const uploadTrainingVideo = async (file: File) => {
       console.log("Upload successful:", data);
     }
     
+    // Generate the correct public URL format
+    const publicUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${fileName}`;
+    
+    console.log("Generated public URL:", publicUrl);
+    
+    // Also try getting the URL through the official method to confirm it works
     const { data: urlData } = supabase.storage
       .from('training_videos')
       .getPublicUrl(fileName);
     
-    console.log("Public URL:", urlData.publicUrl);
+    console.log("Official public URL method:", urlData.publicUrl);
     
-    return urlData.publicUrl;
+    // Return the URL that matches the required format
+    return publicUrl;
   } catch (error) {
     handleError(error, "Error uploading training video:");
     throw error;

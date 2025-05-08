@@ -66,6 +66,8 @@ const TrainingDetail = () => {
         try {
           console.log("Fetching training progress for training:", id, "and user:", user.id);
           const progressData = await fetchTrainingProgress(id, user.id);
+          console.log("Progress data received:", progressData);
+          
           if (progressData) {
             console.log("Progress data loaded:", progressData.progress_pct, "Status:", 
               progressData.completed_at ? "completed" : progressData.progress_pct > 0 ? "in_progress" : "not_started");
@@ -84,12 +86,22 @@ const TrainingDetail = () => {
             console.log("No progress data found");
             setStatus("not_started");
             setProgress(0);
+            
+            // Criar um registro de progresso inicial para evitar status aleatório
+            await updateTrainingProgress(id, user.id, 0, false);
           }
         } catch (error) {
           console.error("Error loading progress:", error);
           console.log("No progress data found, starting fresh");
           setStatus("not_started");
           setProgress(0);
+          
+          // Criar um registro de progresso inicial para evitar status aleatório
+          try {
+            await updateTrainingProgress(id, user.id, 0, false);
+          } catch (initError) {
+            console.error("Failed to initialize progress:", initError);
+          }
         } finally {
           setLoadingProgress(false);
         }
@@ -116,11 +128,19 @@ const TrainingDetail = () => {
       // Update local progress
       setProgress(progressPercent);
       
-      // Note: We don't change status automatically based on progress now
-      // Status is managed separately through the status selector
+      // Update status based on progress
+      let newStatus = status;
+      if (progressPercent >= 100) {
+        newStatus = "completed";
+        setStatus(newStatus);
+      } else if (progressPercent > 0 && status === "not_started") {
+        newStatus = "in_progress";
+        setStatus(newStatus);
+      }
       
       // Send to API with current status
-      await updateTrainingProgress(id, user.id, progressPercent, status === "completed");
+      await updateTrainingProgress(id, user.id, progressPercent, newStatus === "completed");
+      console.log(`Progress updated to ${progressPercent}% with status ${newStatus}`);
     } catch (error) {
       console.error("Error updating progress:", error);
     }
@@ -130,6 +150,7 @@ const TrainingDetail = () => {
     if (!id || !user) return;
     
     try {
+      console.log(`Changing status from ${status} to ${newStatus}`);
       setStatus(newStatus);
       
       // For completed status, set progress to 100%
@@ -145,6 +166,8 @@ const TrainingDetail = () => {
         newProgress, 
         newStatus === "completed"
       );
+      
+      console.log(`Status updated to ${newStatus} with progress ${newProgress}%`);
       
       if (newStatus === "completed") {
         toast({
@@ -275,7 +298,7 @@ const TrainingDetail = () => {
         </div>
         
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {training.video_url && (
+          {training?.video_url && (
             <VideoPlayer 
               videoUrl={training.video_url} 
               videoType={training.video_type}
@@ -322,7 +345,7 @@ const TrainingDetail = () => {
                 </div>
               ) : (
                 <>
-                  {/* Status selector - botões diretos para seleção de status */}
+                  {/* Status buttons - seleção direta sem dropdown */}
                   <div className="mb-4">
                     <span className="text-sm text-gray-600 block mb-2">Status:</span>
                     <div className="flex flex-wrap gap-2">
@@ -335,6 +358,8 @@ const TrainingDetail = () => {
                               ? getStatusColor(statusOption.value)
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                           }`}
+                          aria-pressed={status === statusOption.value}
+                          type="button"
                         >
                           {statusOption.label}
                         </button>

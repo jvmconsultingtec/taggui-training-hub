@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,9 +29,12 @@ const getYoutubeVideoId = (url: string) => {
 const getProperVideoUrl = (url: string) => {
   console.log("Processing video URL:", url);
   
+  // Formato URL correto para o Supabase Storage
+  const SUPABASE_PROJECT_ID = "deudqfjiieufqenzfclv";
+  const BUCKET_NAME = "training_videos";
+  
   // Para URLs completas externas, retorna diretamente
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    // Se for uma URL do Supabase Storage, certifique-se de que o formato está correto
     if (url.includes('supabase.co/storage/v1/object/public/')) {
       console.log("Returning direct Supabase URL:", url);
       return url;
@@ -43,20 +45,21 @@ const getProperVideoUrl = (url: string) => {
   
   // Se for apenas o nome do arquivo, crie a URL completa do Supabase
   if (!url.includes('/')) {
-    const directUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${url}`;
+    // Format: https://[PROJECT_ID].supabase.co/storage/v1/object/public/[BUCKET_NAME]/[FILE_PATH]
+    const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${url}`;
     console.log("Created URL from filename:", directUrl);
     return directUrl;
   }
   
   // Se já tiver 'training_videos/' mas não o URL completo do Supabase
   if (url.includes('training_videos/') && !url.includes('supabase.co')) {
-    const directUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/${url}`;
+    const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${url}`;
     console.log("Created URL from partial path:", directUrl);
     return directUrl;
   }
   
   // Caso padrão - tente construir a URL completa do Supabase
-  const directUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${url}`;
+  const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${url}`;
   console.log("Default URL construction:", directUrl);
   return directUrl;
 };
@@ -240,6 +243,12 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
       }
     }
     
+    console.log("Detailed error information:", {
+      code: videoElement.error?.code,
+      message: videoElement.error?.message,
+      videoUrl: videoSrc,
+    });
+    
     setError(errorMessage);
     setIsPlaying(false);
   };
@@ -254,30 +263,34 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
         // Tente diferentes formatos de URL
         let newUrl: string | null = null;
         
-        // Tenta obter uma URL pública para o arquivo
+        // Formatting the URL correctly for Supabase Storage
+        const SUPABASE_PROJECT_ID = "deudqfjiieufqenzfclv";
+        const BUCKET_NAME = "training_videos";
+        
         if (loadAttempts === 0) {
-          // Primeira tentativa: tente usar a URL exata como está no banco de dados
-          newUrl = videoUrl;
-          console.log("Tentativa 1: Usando URL original:", newUrl);
+          // Try original URL but make sure it has correct Supabase URL format
+          newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${videoUrl.split('/').pop()}`;
+          console.log("Tentativa 1: URL formatada para Supabase:", newUrl);
         } else if (loadAttempts === 1) {
-          // Segunda tentativa: tente obter uma URL pública usando getPublicUrl
+          // Try using the getPublicUrl method
           const fileName = videoUrl.split('/').pop() || videoUrl;
           const { data } = supabase.storage.from('training_videos').getPublicUrl(fileName);
           newUrl = data.publicUrl;
           console.log("Tentativa 2: URL gerada com getPublicUrl:", newUrl);
         } else if (loadAttempts === 2) {
-          // Terceira tentativa: tente com o caminho completo incluindo training_videos/
-          if (!videoUrl.includes('training_videos/')) {
-            newUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${videoUrl}`;
+          // Try with the full path including uploads/
+          const fileName = videoUrl.split('/').pop() || videoUrl;
+          if (!fileName.includes('uploads/')) {
+            newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/uploads/${fileName}`;
           } else {
-            newUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/${videoUrl}`;
+            newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${fileName}`;
           }
           console.log("Tentativa 3: URL com path completo:", newUrl);
         } else {
-          // Última tentativa: use URL direta com nome do arquivo apenas
+          // Last attempt: try different bucket name format (with hyphen)
           const fileName = videoUrl.split('/').pop() || videoUrl;
-          newUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${fileName}`;
-          console.log("Tentativa 4: URL direta com nome de arquivo:", newUrl);
+          newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${fileName}`;
+          console.log("Tentativa 4: URL com nome de bucket alternativo:", newUrl);
         }
         
         if (newUrl) {
