@@ -374,7 +374,7 @@ export type Database = {
         Returns: string
       }
       is_admin: {
-        Args: { user_id?: string }
+        Args: Record<PropertyKey, never> | { user_id?: string }
         Returns: boolean
       }
       promover_a_admin: {
@@ -383,6 +383,10 @@ export type Database = {
       }
       user_belongs_to_company: {
         Args: { user_id: string; company_id: string }
+        Returns: boolean
+      }
+      user_has_training_access: {
+        Args: { p_user_id: string; p_training_id: string }
         Returns: boolean
       }
     }

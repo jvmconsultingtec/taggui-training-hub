@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -19,20 +20,25 @@ const UserGroupForm = () => {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [companyId, setCompanyId] = useState<string | undefined>(undefined);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   
   const isEditMode = !!id;
   
   useEffect(() => {
-    // Get the company ID using the get_current_user_company_id function
+    // First fetch the user's company ID
     const fetchUserCompany = async () => {
       if (user?.id) {
         try {
-          // Use the security definer function to avoid RLS recursion
-          const companyIdResult = await executeRPC<string>('get_current_user_company_id');
+          console.log("Fetching company ID for user:", user.id);
           
-          if (companyIdResult) {
-            setCompanyId(companyIdResult);
+          // Direct database query to get company ID (using the security definer function)
+          const { data, error } = await supabase.rpc('get_current_user_company_id');
+          
+          if (error) throw error;
+          
+          console.log("Company ID retrieved:", data);
+          if (data) {
+            setCompanyId(data);
           } else {
             throw new Error("Company ID not found");
           }
@@ -49,6 +55,7 @@ const UserGroupForm = () => {
     
     fetchUserCompany();
     
+    // Then load group data if in edit mode
     if (isEditMode) {
       loadGroupData();
     }
@@ -104,6 +111,7 @@ const UserGroupForm = () => {
     
     try {
       setSaving(true);
+      console.log("Saving group with company ID:", companyId);
       
       if (isEditMode) {
         // Atualizar grupo existente
@@ -123,16 +131,22 @@ const UserGroupForm = () => {
         });
       } else {
         // Criar novo grupo
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("user_groups")
           .insert({
             name,
             description: description.trim() || null,
             created_by: user?.id,
             company_id: companyId
-          });
+          })
+          .select();
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error details:", error);
+          throw error;
+        }
+        
+        console.log("Group created successfully:", data);
         
         toast({
           title: "Grupo criado",
@@ -142,11 +156,11 @@ const UserGroupForm = () => {
       
       // Redirecionar para a lista de grupos
       navigate("/admin/groups");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao salvar grupo:", error);
       toast({
         title: "Erro",
-        description: isEditMode ? "Não foi possível atualizar o grupo" : "Não foi possível criar o grupo",
+        description: error.message || (isEditMode ? "Não foi possível atualizar o grupo" : "Não foi possível criar o grupo"),
         variant: "destructive",
       });
     } finally {

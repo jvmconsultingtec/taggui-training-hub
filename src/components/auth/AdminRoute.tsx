@@ -3,7 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
-import { supabase, executeRPC } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 export const AdminRoute = () => {
@@ -19,8 +19,11 @@ export const AdminRoute = () => {
       }
       
       try {
-        // Usar a função RPC is_admin para verificar se o usuário é administrador
-        const isAdminResult = await executeRPC<boolean>('is_admin');
+        // Use the security definer function to check admin status
+        const { data: isAdminResult, error } = await supabase.rpc('is_admin');
+        
+        if (error) throw error;
+        
         console.log("Is user admin?", isAdminResult);
         setIsAdmin(isAdminResult);
       } catch (error) {
@@ -38,6 +41,8 @@ export const AdminRoute = () => {
     
     if (!loading && user) {
       checkAdminStatus();
+    } else if (!loading && !user) {
+      setCheckingPermissions(false);
     }
   }, [user, loading]);
 
