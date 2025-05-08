@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -67,7 +68,9 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
   try {
     console.log(`Executing RPC function: ${functionName}`, params);
     
-    const { data, error } = await supabase.rpc<T, any>(functionName, params || {});
+    // Use 'any' for the function name to bypass the strict type checking
+    // since we're passing the function name as a runtime string
+    const { data, error } = await supabase.rpc(functionName as any, params || {});
     
     if (error) {
       console.error(`Error executing RPC ${functionName}:`, error);
