@@ -2,7 +2,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 
 export const AdminRoute = () => {

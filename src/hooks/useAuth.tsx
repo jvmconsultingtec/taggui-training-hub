@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const checkAdminStatus = async () => {
     try {
       console.log("Checking admin status in useAuth");
-      // Use the direct RPC function to avoid recursion issues
+      // Chamar a função sem parâmetros para evitar sobrecarga
       const { data, error } = await supabase.rpc('is_admin');
         
       if (error) {
