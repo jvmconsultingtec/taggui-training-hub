@@ -16,7 +16,10 @@ interface StatsProps {
 }
 
 export function TrainingStats({ total, completed, inProgress, overdue = 0 }: StatsProps) {
-  const completionPercentage = total > 0 ? (completed / total) * 100 : 0;
+  // Ensure total is accurate and consistent
+  const realTotal = Math.max(total, completed + inProgress + overdue);
+  
+  const completionPercentage = realTotal > 0 ? (completed / realTotal) * 100 : 0;
 
   return (
     <Card>
@@ -42,16 +45,17 @@ export function TrainingStats({ total, completed, inProgress, overdue = 0 }: Sta
             <span className="text-xl font-semibold">{inProgress}</span>
             <p className="text-xs text-muted-foreground">Em andamento</p>
           </div>
-          {overdue > 0 && (
+          {overdue > 0 ? (
             <div className="space-y-1 text-center p-2 bg-red-50 rounded-lg">
               <span className="text-xl font-semibold">{overdue}</span>
               <p className="text-xs text-muted-foreground">Atrasados</p>
             </div>
+          ) : (
+            <div className="space-y-1 text-center p-2 bg-gray-50 rounded-lg">
+              <span className="text-xl font-semibold">{realTotal}</span>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </div>
           )}
-          <div className="space-y-1 text-center p-2 bg-gray-50 rounded-lg">
-            <span className="text-xl font-semibold">{total}</span>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </div>
         </div>
       </CardContent>
     </Card>

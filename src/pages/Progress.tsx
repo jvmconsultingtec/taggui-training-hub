@@ -46,14 +46,17 @@ const ProgressPage = () => {
         setLoading(true);
         setError(null);
         
+        console.log("Fetching user progress for user ID:", user.id);
         // Use the dedicated method to fetch user progress with trainings
         const progressData = await fetchUserTrainingProgress(user.id);
+        console.log("Progress data received:", progressData);
         
         if (!progressData || progressData.length === 0) {
-          console.log("No progress data found");
+          console.log("No progress data found, fetching assignments");
           
           // If no progress data, try to get assigned trainings
           const assignments = await fetchAssignedTrainings(user.id);
+          console.log("Assignments received:", assignments);
           
           if (!assignments || assignments.length === 0) {
             console.log("No assignments found");
@@ -81,6 +84,7 @@ const ProgressPage = () => {
             };
           }).filter(Boolean) as TrainingWithProgress[];
           
+          console.log("Trainings with progress created:", trainingWithProgress);
           setTrainings(trainingWithProgress);
         } else {
           // Map progress data to trainings with progress
@@ -112,6 +116,7 @@ const ProgressPage = () => {
             };
           }).filter(Boolean) as TrainingWithProgress[];
           
+          console.log("Mapped trainings with progress:", trainingWithProgress);
           setTrainings(trainingWithProgress);
         }
       } catch (err: any) {
@@ -234,6 +239,19 @@ const ProgressPage = () => {
                         </div>
                       )}
                     </div>
+                    
+                    <div className="flex justify-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        asChild
+                      >
+                        <Link to={`/trainings/${training.id}`}>
+                          <Play className="h-4 w-4 mr-1" /> Ver treinamento
+                        </Link>
+                      </Button>
+                    </div>
+                    
                     <Separator className="my-2" />
                   </div>
                 ))

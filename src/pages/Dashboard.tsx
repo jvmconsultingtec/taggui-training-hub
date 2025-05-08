@@ -79,8 +79,13 @@ const Dashboard = () => {
         
         // Fetch assigned trainings
         const assignments = await fetchAssignedTrainings(user.id);
-        setTrainings(assignments);
-        console.log("Trainings loaded:", assignments.length);
+        if (!assignments || assignments.length === 0) {
+          console.log("No assignments found for user");
+          setTrainings([]);
+        } else {
+          setTrainings(assignments);
+          console.log("Trainings loaded:", assignments.length);
+        }
         
         // Fetch progress for all trainings
         const progress = await fetchUserTrainingProgress(user.id);
@@ -116,6 +121,12 @@ const Dashboard = () => {
   const totalTrainings = trainings.length;
   const completedTrainings = Object.values(progressMap).filter(p => p.completed_at !== null).length;
   const inProgressTrainings = Object.values(progressMap).filter(p => !p.completed_at && p.progress_pct > 0).length;
+  
+  console.log("Stats calculations:", {
+    total: totalTrainings,
+    completed: completedTrainings,
+    inProgress: inProgressTrainings
+  });
 
   // Get status for a training
   const getTrainingStatus = (trainingId: string) => {

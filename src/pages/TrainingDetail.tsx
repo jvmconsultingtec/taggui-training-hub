@@ -137,16 +137,28 @@ const TrainingDetail = () => {
   const handleStatusChange = async (newStatus: TrainingStatusType) => {
     if (!id || !user) return;
     
+    // Se estamos tentando alterar para o mesmo status, não faz nada
+    if (newStatus === status) {
+      console.log("Status já está definido como", newStatus);
+      return;
+    }
+    
     try {
       setStatusChanging(true);
       console.log(`Changing status from ${status} to ${newStatus}`);
       
       // Calculate new progress based on status
       let newProgress = progress;
-      if (newStatus === "completed" && progress < 100) {
-        newProgress = 100;
-      } else if (newStatus === "in_progress" && progress === 0) {
-        newProgress = 10; // Start with some progress
+      if (newStatus === "completed") {
+        newProgress = 100; // Sempre 100% para concluído
+      } else if (newStatus === "in_progress") {
+        // Se estiver vindo de "concluído", definir um valor médio
+        if (status === "completed") {
+          newProgress = 50;
+        } else if (progress === 0) {
+          // Se vindo de "não iniciado", iniciar com algum progresso
+          newProgress = 10;
+        }
       } else if (newStatus === "not_started") {
         newProgress = 0; // Reset progress
       }
