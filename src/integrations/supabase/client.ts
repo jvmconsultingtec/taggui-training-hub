@@ -11,6 +11,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     detectSessionInUrl: true,
     storage: typeof window !== 'undefined' ? localStorage : undefined
+  },
+  global: {
+    // Add custom headers for Storage requests
+    headers: {
+      // Este cabeçalho é útil para o CDN do Supabase
+      'cache-control': 'no-cache, no-store'
+    }
   }
 });
 

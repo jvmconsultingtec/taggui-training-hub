@@ -1,8 +1,8 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 interface VideoPlayerProps {
   videoUrl: string;
@@ -25,17 +25,20 @@ const getYoutubeVideoId = (url: string) => {
   return match && match[2].length === 11 ? match[2] : null;
 };
 
-// Add public URL to Supabase storage URLs if needed
+// Get proper URL for Supabase storage files
 const getProperVideoUrl = (url: string) => {
-  // If it's already a complete URL, return it
+  // If it's a complete URL, return it
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
   
-  // Otherwise treat as a storage path and construct proper URL
-  // Using Supabase URL from environment or default
-  const supabaseUrl = "https://deudqfjiieufqenzfclv.supabase.co";
-  return `${supabaseUrl}/storage/v1/object/public/${url}`;
+  // If it's a storage URL that doesn't include the bucket name, add it
+  if (!url.includes('training_videos/')) {
+    return `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${url}`;
+  }
+  
+  // Otherwise construct a proper storage URL
+  return `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/${url}`;
 };
 
 const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 0 }: VideoPlayerProps) => {
@@ -47,7 +50,6 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const [progress, setProgress] = useState(initialProgress);
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
-  const [availableFormats, setAvailableFormats] = useState<string[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -55,22 +57,13 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   useEffect(() => {
     if (videoType === "UPLOAD") {
       try {
+        console.log("Original video URL:", videoUrl);
         const directUrl = getProperVideoUrl(videoUrl);
-        console.log("Initial URL attempt:", directUrl);
+        console.log("Attempting to load video from:", directUrl);
         setVideoSrc(directUrl);
-        
-        // Prepare alternative formats to try if the primary one fails
-        const urlWithoutExtension = videoUrl.replace(/\.[^/.]+$/, "");
-        const alternativeFormats = [
-          videoUrl, // Original URL
-          `training_videos/${videoUrl.split('/').pop()}`, // Just the filename with training_videos prefix
-          `uploads/${videoUrl.split('/').pop()}`, // Just the filename with uploads prefix
-        ];
-        
-        console.log("Alternative formats prepared:", alternativeFormats);
-        setAvailableFormats(alternativeFormats);
       } catch (err) {
         console.error("Error setting up video URL:", err);
+        setError("Erro ao processar URL do vídeo");
       }
     }
   }, [videoUrl, videoType]);
@@ -229,45 +222,45 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
     
     setError(errorMessage);
     setIsPlaying(false);
-    
-    // Try to load with next available format if there are more to try
-    if (availableFormats.length > 0) {
-      const nextFormat = availableFormats.shift();
-      if (nextFormat) {
-        console.log("Auto trying next format:", nextFormat);
-        setVideoSrc(getProperVideoUrl(nextFormat));
-      }
-    }
   };
   
-  // Try direct URL for video
-  const tryDirectUrl = () => {
-    if (videoUrl && videoType === "UPLOAD") {
+  // Try alternative URL
+  const tryAlternativeUrl = async () => {
+    if (videoUrl) {
       try {
-        // Prepare a list of URLs to try
-        const urlsToTry = [
-          // Original with authenticated path
-          videoUrl.replace('/storage/v1/object/public', '/storage/v1/object/authenticated'),
-          // Try with direct Supabase URL
-          `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${videoUrl.split('/').pop()}`,
-          // Try with just the filename in training_videos bucket
-          `training_videos/${videoUrl.split('/').pop()}`,
-          // Try with direct embed
-          `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/authenticated/training_videos/${videoUrl.split('/').pop()}?download=true`,
-        ];
+        setError("Tentando URL alternativa...");
         
-        // Use the first URL that hasn't been tried yet
-        const nextUrl = urlsToTry.find(url => url !== videoSrc);
+        // Lista os arquivos no bucket para debugging
+        const { data: files, error: listError } = await supabase
+          .storage
+          .from('training_videos')
+          .list();
+          
+        if (listError) {
+          console.error("Erro ao listar arquivos:", listError);
+          setError(`Não foi possível acessar o bucket: ${listError.message}`);
+          return;
+        }
         
-        if (nextUrl) {
-          console.log("Trying alternative URL:", nextUrl);
-          setVideoSrc(getProperVideoUrl(nextUrl));
+        console.log("Arquivos disponíveis no bucket:", files);
+        
+        // Tenta diferentes formatos de URL
+        const fileName = videoUrl.split('/').pop() || videoUrl;
+        
+        // Tenta obter uma URL pública para o arquivo
+        const { data: publicData } = supabase
+          .storage
+          .from('training_videos')
+          .getPublicUrl(fileName);
+        
+        if (publicData) {
+          console.log("URL pública gerada:", publicData.publicUrl);
+          setVideoSrc(publicData.publicUrl);
           setError(null);
-        } else {
-          setError("Tentamos todos os formatos disponíveis. O vídeo pode estar indisponível.");
         }
       } catch (err) {
-        console.error("Error with alternative URL:", err);
+        console.error("Erro ao tentar URL alternativa:", err);
+        setError("Não foi possível carregar o vídeo de forma alternativa.");
       }
     }
   };
@@ -282,7 +275,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
             <p>{error}</p>
             <div className="flex justify-end mt-4">
               <Button 
-                onClick={tryDirectUrl}
+                onClick={tryAlternativeUrl}
                 variant="secondary"
                 size="sm"
               >
@@ -308,6 +301,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
               onProgressUpdate(100);
             }
           }}
+          controls // Adicionando controles nativos do navegador como fallback
           crossOrigin="anonymous"
         >
           <source src={videoSrc} type="video/mp4" />

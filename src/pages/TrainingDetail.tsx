@@ -5,19 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import VideoPlayer from "@/components/trainings/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, Clock, Users, Loader, Edit, Check } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Users, Loader } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export type TrainingStatusType = "not_started" | "in_progress" | "completed";
 
@@ -30,7 +23,6 @@ const TrainingDetail = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<TrainingStatusType>("not_started");
   const [error, setError] = useState<string | null>(null);
-  const [editingStatus, setEditingStatus] = useState(false);
 
   useEffect(() => {
     const loadTraining = async () => {
@@ -152,8 +144,6 @@ const TrainingDetail = () => {
           description: "Treinamento marcado como concluído"
         });
       }
-      
-      setEditingStatus(false);
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
@@ -181,6 +171,13 @@ const TrainingDetail = () => {
       default: return "bg-gray-200";
     }
   };
+
+  // Lista de status disponíveis para treinamentos
+  const availableStatuses: {value: TrainingStatusType, label: string}[] = [
+    { value: "not_started", label: "Não iniciado" },
+    { value: "in_progress", label: "Em andamento" },
+    { value: "completed", label: "Concluído" }
+  ];
 
   if (loading) {
     return (
@@ -311,45 +308,24 @@ const TrainingDetail = () => {
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-medium mb-4">Seu progresso</h3>
               
+              {/* Status selector - agora com edição direta */}
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm text-gray-600">Status:</span>
-                {editingStatus ? (
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={status}
-                      onValueChange={(value) => handleStatusChange(value as TrainingStatusType)}
+                <div className="flex flex-wrap gap-2">
+                  {availableStatuses.map(statusOption => (
+                    <button
+                      key={statusOption.value}
+                      onClick={() => handleStatusChange(statusOption.value)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        status === statusOption.value
+                          ? getStatusColor(statusOption.value)
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
                     >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not_started">Não iniciado</SelectItem>
-                        <SelectItem value="in_progress">Em andamento</SelectItem>
-                        <SelectItem value="completed">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setEditingStatus(false)}
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${getStatusColor(status)}`}>
-                      {getStatusLabel(status)}
-                    </Badge>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setEditingStatus(true)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                      {statusOption.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               
               <div className="progress-bar mb-2 bg-gray-200 rounded-full overflow-hidden h-2">

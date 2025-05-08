@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -46,11 +45,20 @@ const handleError = (error: any, message: string) => {
 export const ensureTrainingVideosBucket = async () => {
   try {
     // Check if bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error("Error checking buckets:", bucketsError);
+      return;
+    }
+    
+    console.log("Available buckets:", buckets);
+    
     const bucketExists = buckets?.some(bucket => bucket.name === 'training_videos');
     
     if (!bucketExists) {
       // Create bucket
+      console.log("Bucket 'training_videos' not found, creating it...");
       const { data, error } = await supabase.storage.createBucket('training_videos', {
         public: true,
         fileSizeLimit: 52428800, // 50MB
@@ -59,7 +67,21 @@ export const ensureTrainingVideosBucket = async () => {
       if (error) {
         console.error("Error creating training_videos bucket:", error);
       } else {
-        console.log("Created training_videos bucket");
+        console.log("Created training_videos bucket:", data);
+      }
+    } else {
+      console.log("Bucket 'training_videos' already exists");
+      
+      // Update bucket to ensure it's public
+      const { error: updateError } = await supabase.storage.updateBucket('training_videos', {
+        public: true,
+        fileSizeLimit: 52428800, // 50MB
+      });
+      
+      if (updateError) {
+        console.error("Error updating bucket to public:", updateError);
+      } else {
+        console.log("Updated training_videos bucket to be public");
       }
     }
   } catch (error) {
@@ -392,18 +414,9 @@ export const uploadTrainingVideo = async (file: File) => {
     
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-    const filePath = `uploads/${fileName}`;
+    const filePath = `${fileName}`;
     
     console.log("Upload path:", filePath, "File size:", file.size);
-    
-    // Check available buckets
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error("Error listing buckets:", bucketsError);
-    } else {
-      console.log("Available buckets:", buckets);
-    }
     
     // For large files, use a chunked upload approach
     if (file.size > 5 * 1024 * 1024) { // For files larger than 5MB
@@ -452,7 +465,7 @@ export const uploadTrainingVideo = async (file: File) => {
     
     const { data: urlData } = supabase.storage
       .from('training_videos')
-      .getPublicUrl(filePath);
+      .getPublicUrl(fileName);
     
     console.log("Public URL:", urlData.publicUrl);
     
