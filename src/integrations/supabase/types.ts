@@ -219,6 +219,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      fetch_company_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          company_id: string
+          created_at: string | null
+          email: string
+          id: string
+          linkedin_id: string | null
+          name: string
+          role: Database["public"]["Enums"]["user_role"] | null
+        }[]
+      }
       get_current_user_company_id: {
         Args: Record<PropertyKey, never>
         Returns: string

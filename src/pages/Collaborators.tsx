@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, executeRPC } from "@/integrations/supabase/client";
 import {
   Table,
   TableBody,
@@ -52,45 +51,13 @@ const Collaborators = () => {
         setLoading(true);
         setError(null);
         
-        // Get the current authenticated user session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          throw new Error("No authenticated session");
-        }
+        // Use the RPC function fetch_company_users to get users from the same company
+        // This avoids the recursive RLS policy issue
+        const usersData = await executeRPC<User[]>('fetch_company_users');
         
-        // Use direct RPC call instead of querying the users table
-        // This avoids the RLS policy recursion issue
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          throw userError;
-        }
-        
-        if (!userData.user) {
-          throw new Error("User data not available");
-        }
-        
-        // Fetch user profiles from the users table using a simple approach
-        // We'll use the user's own ID to get details first
-        const { data: currentUser, error: profileError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userData.user.id)
-          .single();
-          
-        if (profileError) {
-          console.error("Error fetching current user:", profileError);
-          throw profileError;
-        }
-        
-        // For simplicity during development, just show the current user
-        // This is a temporary solution until we implement a proper RLS policy
-        // or stored procedure to fetch users without recursion
-        const usersArray = currentUser ? [currentUser] : [];
-        
-        console.log("Users data:", usersArray);
-        setUsers(usersArray);
-        setFilteredUsers(usersArray);
+        console.log("Users data from RPC:", usersData);
+        setUsers(usersData || []);
+        setFilteredUsers(usersData || []);
       } catch (err: any) {
         console.error("Erro ao carregar colaboradores:", err);
         setError("Não foi possível carregar a lista de colaboradores. Por favor, tente novamente mais tarde.");

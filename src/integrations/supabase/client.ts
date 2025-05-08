@@ -1,4 +1,5 @@
 
+
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -64,12 +65,12 @@ export const refreshData = async <T>(callback: () => Promise<T>): Promise<T> => 
 
 // Execute an RPC function that returns data rather than querying tables directly
 // This helps avoid RLS recursion issues with policies that reference the same table
-export const executeRPC = async <T>(functionName: string, params?: Record<string, any>): Promise<T[]> => {
+export const executeRPC = async <T>(functionName: string, params?: Record<string, any>): Promise<T> => {
   try {
     console.log(`Executing RPC function: ${functionName}`, params);
     
-    // Use 'any' for the function name to bypass the strict type checking
-    // since we're passing the function name as a runtime string
+    // Use type assertion (as any) to bypass the TypeScript constraint
+    // This allows us to use any function name at runtime
     const { data, error } = await supabase.rpc(functionName as any, params || {});
     
     if (error) {
@@ -78,7 +79,7 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
     }
     
     // Ensure we return an array, even if data is null
-    return (data || []) as T[];
+    return (data || []) as T;
   } catch (error) {
     console.error(`Exception in RPC ${functionName}:`, error);
     throw error;
