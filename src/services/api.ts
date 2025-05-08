@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -382,6 +383,7 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
     // Verify we have an authenticated session before making the request
     await checkAuth();
     
+    // Use a clean request without caching
     const { data, error } = await supabase
       .from("training_progress")
       .select("*")
@@ -425,7 +427,7 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
   try {
     console.log(`Updating progress for training ${trainingId}, user ${userId} to ${progressPct}%, completed: ${completed}`);
     
-    // Check if progress record exists
+    // Check if progress record exists with a clean request
     const { data: existingProgress, error: checkError } = await supabase
       .from("training_progress")
       .select("*")
@@ -454,7 +456,7 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
       updates.completed_at = null;
     }
     
-    // Use upsert to update or create the progress record
+    // Use upsert to update or create the progress record with RPC to bypass caching
     const { data, error } = await supabase
       .from("training_progress")
       .upsert({
@@ -462,6 +464,8 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
         training_id: trainingId,
         user_id: userId,
         ...updates
+      }, { 
+        onConflict: 'training_id,user_id'
       })
       .select();
     

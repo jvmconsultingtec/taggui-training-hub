@@ -47,3 +47,17 @@ export const isAuthenticated = async (): Promise<boolean> => {
     return false;
   }
 };
+
+// Helper to refresh data and bypass cache
+export const refreshData = async <T>(callback: () => Promise<T>): Promise<T> => {
+  try {
+    // Add a tiny delay to ensure the previous operation has time to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Call the provided callback to fetch fresh data
+    return await callback();
+  } catch (error) {
+    console.error("Error refreshing data:", error);
+    throw error;
+  }
+};

@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { refreshData } from "@/integrations/supabase/client";
 
 export type TrainingStatusType = "not_started" | "in_progress" | "completed";
 
@@ -25,6 +26,7 @@ const TrainingDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [statusChanging, setStatusChanging] = useState(false);
+  const [updateKey, setUpdateKey] = useState(0); // Key to force re-render
 
   useEffect(() => {
     const loadTraining = async () => {
@@ -106,7 +108,7 @@ const TrainingDetail = () => {
     };
     
     loadTraining();
-  }, [id, user, session, navigate]);
+  }, [id, user, session, navigate, updateKey]); // Added updateKey to trigger re-render
 
   const handleProgressUpdate = async (progressPercent: number) => {
     if (!id || !user) return;
@@ -167,13 +169,13 @@ const TrainingDetail = () => {
       setStatus(newStatus);
       setProgress(newProgress);
       
-      // Send to API
-      const result = await updateTrainingProgress(
+      // Send to API using the refreshData helper to ensure we're getting a clean request
+      const result = await refreshData(() => updateTrainingProgress(
         id, 
         user.id, 
         newProgress, 
         newStatus === "completed"
-      );
+      ));
       
       console.log(`Status updated to ${newStatus} with progress ${newProgress}%`, result);
       
@@ -181,6 +183,10 @@ const TrainingDetail = () => {
         title: "Status atualizado",
         description: `Treinamento marcado como ${newStatus === "completed" ? "concluído" : newStatus === "in_progress" ? "em andamento" : "não iniciado"}`
       });
+      
+      // Force a refresh of the component to ensure latest data
+      setUpdateKey(prev => prev + 1);
+      
     } catch (error) {
       console.error("Error updating status:", error);
       toast({
@@ -382,11 +388,7 @@ const TrainingDetail = () => {
                   <div className="mb-4">
                     <span className="text-sm text-gray-600 block mb-2">Status:</span>
                     <div className="flex flex-wrap gap-2">
-                      {[
-                        { value: "not_started", label: "Não iniciado" },
-                        { value: "in_progress", label: "Em andamento" },
-                        { value: "completed", label: "Concluído" }
-                      ].map(statusOption => (
+                      {availableStatuses.map(statusOption => (
                         <button
                           key={statusOption.value}
                           onClick={() => handleStatusChange(statusOption.value as TrainingStatusType)}

@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { refreshData } from "@/integrations/supabase/client";
 
 type Assignment = {
   id: string;
@@ -77,8 +78,8 @@ const Dashboard = () => {
         
         console.log("Loading trainings and progress for user:", user.id);
         
-        // Fetch assigned trainings
-        const assignments = await fetchAssignedTrainings(user.id);
+        // Fetch assigned trainings with fresh data
+        const assignments = await refreshData(() => fetchAssignedTrainings(user.id));
         if (!assignments || assignments.length === 0) {
           console.log("No assignments found for user");
           setTrainings([]);
@@ -87,8 +88,8 @@ const Dashboard = () => {
           console.log("Trainings loaded:", assignments.length);
         }
         
-        // Fetch progress for all trainings
-        const progress = await fetchUserTrainingProgress(user.id);
+        // Fetch progress for all trainings with fresh data
+        const progress = await refreshData(() => fetchUserTrainingProgress(user.id));
         console.log("Progress loaded:", progress.length);
         
         // Create a map of training_id to progress data

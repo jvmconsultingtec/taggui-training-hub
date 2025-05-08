@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PlusCircle, Filter, Search, MoreVertical, Edit, Trash2, Users, Loader } from "lucide-react";
 import Layout from "../components/layout/Layout";
-import { fetchTrainings, deleteTraining } from "@/services/api";
+import { fetchTrainings, deleteTraining, fetchCurrentUser, fetchUserTrainingProgress } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type TrainingStatus = "all" | "not_started" | "in_progress" | "completed";
+import { useAuth } from "@/hooks/useAuth";
+import { TrainingStatus } from "@/components/trainings/TrainingCard";
 
 type Training = {
   id: string;
@@ -27,6 +28,14 @@ type Training = {
   tags: string[] | null;
   company_id: string;
   author: string | null;
+  status?: TrainingStatus;
+};
+
+type TrainingProgressMap = {
+  [trainingId: string]: {
+    progress_pct: number;
+    completed_at: string | null;
+  };
 };
 
 // Dropdown menu component for table actions
@@ -87,22 +96,67 @@ const ActionsMenu = ({ id, onDelete }: { id: string, onDelete: () => void }) => 
 
 const TrainingsList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<TrainingStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | TrainingStatus>("all");
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [filteredTrainings, setFilteredTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [progressMap, setProgressMap] = useState<TrainingProgressMap>({});
   
-  const loadTrainings = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchTrainings();
-      setTrainings(data);
-      setFilteredTrainings(data);
+      
+      // First, fetch all trainings
+      const trainingsData = await fetchTrainings();
+      
+      if (!user) {
+        setTrainings(trainingsData);
+        setFilteredTrainings(trainingsData);
+        setLoading(false);
+        return;
+      }
+      
+      // Then fetch the current user's progress for all trainings
+      const progressData = await fetchUserTrainingProgress(user.id);
+      
+      // Create a map of training_id to progress data
+      const newProgressMap: TrainingProgressMap = {};
+      progressData.forEach((item: any) => {
+        newProgressMap[item.training_id] = {
+          progress_pct: item.progress_pct || 0,
+          completed_at: item.completed_at
+        };
+      });
+      
+      setProgressMap(newProgressMap);
+      
+      // Add status to each training based on progress data
+      const trainingsWithStatus = trainingsData.map((training: Training) => {
+        const progress = newProgressMap[training.id];
+        let status: TrainingStatus = "not_started";
+        
+        if (progress) {
+          if (progress.completed_at) {
+            status = "completed";
+          } else if (progress.progress_pct > 0) {
+            status = "in_progress";
+          }
+        }
+        
+        return {
+          ...training,
+          status
+        };
+      });
+      
+      setTrainings(trainingsWithStatus);
+      setFilteredTrainings(trainingsWithStatus);
     } catch (err) {
       console.error("Erro ao carregar treinamentos:", err);
       setError("Não foi possível carregar os treinamentos. Por favor, tente novamente mais tarde.");
@@ -117,8 +171,8 @@ const TrainingsList = () => {
   };
   
   useEffect(() => {
-    loadTrainings();
-  }, []);
+    loadData();
+  }, [user]);
   
   // Get all unique tags from trainings
   const allTags = Array.from(
@@ -135,14 +189,14 @@ const TrainingsList = () => {
       const matchesTags = filterTags.length === 0 || 
         (training.tags && filterTags.some(tag => training.tags?.includes(tag)));
       
-      // We don't need to filter by status here as we don't have status in the training object
-      // That will be handled in the UI with separate mock data
+      // Filter by status if not "all"
+      const matchesStatus = statusFilter === "all" || training.status === statusFilter;
         
-      return matchesSearch && matchesTags;
+      return matchesSearch && matchesTags && matchesStatus;
     });
     
     setFilteredTrainings(filtered);
-  }, [searchQuery, filterTags, trainings]);
+  }, [searchQuery, filterTags, statusFilter, trainings]);
   
   // Toggle tag filter
   const toggleTag = (tag: string) => {
@@ -192,6 +246,26 @@ const TrainingsList = () => {
     { value: "completed", label: "Concluídos" }
   ];
 
+  // Get status label function
+  const getStatusLabel = (status: TrainingStatus) => {
+    switch (status) {
+      case "completed": return "Concluído";
+      case "in_progress": return "Em andamento";
+      case "not_started": return "Não iniciado";
+      default: return "Desconhecido";
+    }
+  };
+
+  // Get status color function
+  const getStatusColor = (status: TrainingStatus) => {
+    switch (status) {
+      case "completed": return "bg-green-100 text-green-800";
+      case "in_progress": return "bg-blue-100 text-blue-800";
+      case "not_started": return "bg-gray-100 text-gray-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto py-6 space-y-6">
@@ -228,7 +302,7 @@ const TrainingsList = () => {
           <div className="w-40">
             <Select 
               value={statusFilter} 
-              onValueChange={(value) => setStatusFilter(value as TrainingStatus)}
+              onValueChange={(value) => setStatusFilter(value as "all" | TrainingStatus)}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Status" />
@@ -289,87 +363,63 @@ const TrainingsList = () => {
                     </td>
                   </tr>
                 ) : filteredTrainings.length > 0 ? (
-                  filteredTrainings
-                    .filter(training => {
-                      // Apply status filter if it's not "all"
-                      if (statusFilter === "all") return true;
-                      
-                      // For demo purpose, we're using ID to determine status
-                      // In a real app, you'd use actual status data
-                      const trainingId = parseInt(training.id.charAt(0));
-                      if (statusFilter === "completed" && trainingId % 3 === 0) return true;
-                      if (statusFilter === "in_progress" && trainingId % 3 === 1) return true;
-                      if (statusFilter === "not_started" && trainingId % 3 === 2) return true;
-                      
-                      return false;
-                    })
-                    .map((training) => {
-                      // For demo purpose, determine status based on ID
-                      // In a real app, you'd use actual status data
-                      const trainingId = parseInt(training.id.charAt(0));
-                      let status: { label: string; color: string };
-                      
-                      if (trainingId % 3 === 0) {
-                        status = { label: "Concluído", color: "bg-green-100 text-green-800" };
-                      } else if (trainingId % 3 === 1) {
-                        status = { label: "Em andamento", color: "bg-blue-100 text-blue-800" };
-                      } else {
-                        status = { label: "Não iniciado", color: "bg-gray-100 text-gray-800" };
-                      }
-                      
-                      return (
-                        <tr key={training.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Link 
-                              to={`/trainings/${training.id}`} 
-                              className="font-medium text-gray-900 hover:text-taggui-primary"
-                            >
-                              {training.title}
-                            </Link>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{training.description}</p>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {formatDate(training.created_at)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {training.duration_min} min
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {training.author || "Geral"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-wrap gap-1">
-                              {training.tags && training.tags.map((tag, index) => (
-                                <span 
-                                  key={index}
-                                  className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-600"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                              {(!training.tags || training.tags.length === 0) && (
-                                <span className="text-xs text-gray-400">Sem tags</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            {deleting === training.id ? (
-                              <span className="text-sm text-gray-500 italic">Excluindo...</span>
-                            ) : (
-                              <ActionsMenu 
-                                id={training.id} 
-                                onDelete={() => handleDeleteTraining(training.id)}
-                              />
+                  filteredTrainings.map((training) => {
+                    // Get the status from the training object
+                    const status = training.status || "not_started";
+                    
+                    return (
+                      <tr key={training.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Link 
+                            to={`/trainings/${training.id}`} 
+                            className="font-medium text-gray-900 hover:text-taggui-primary"
+                          >
+                            {training.title}
+                          </Link>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-1">{training.description}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {formatDate(training.created_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {training.duration_min} min
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {training.author || "Geral"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+                            {getStatusLabel(status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1">
+                            {training.tags && training.tags.map((tag, index) => (
+                              <span 
+                                key={index}
+                                className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-600"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {(!training.tags || training.tags.length === 0) && (
+                              <span className="text-xs text-gray-400">Sem tags</span>
                             )}
-                          </td>
-                        </tr>
-                      );
-                    })
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {deleting === training.id ? (
+                            <span className="text-sm text-gray-500 italic">Excluindo...</span>
+                          ) : (
+                            <ActionsMenu 
+                              id={training.id} 
+                              onDelete={() => handleDeleteTraining(training.id)}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center">
