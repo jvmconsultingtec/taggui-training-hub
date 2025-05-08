@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -68,7 +67,7 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
   try {
     console.log(`Executing RPC function: ${functionName}`, params);
     
-    const { data, error } = await supabase.rpc<T>(functionName, params || {});
+    const { data, error } = await supabase.rpc<T, any>(functionName, params || {});
     
     if (error) {
       console.error(`Error executing RPC ${functionName}:`, error);
