@@ -23,6 +23,7 @@ const TrainingDetail = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<TrainingStatusType>("not_started");
   const [error, setError] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(false);
 
   useEffect(() => {
     const loadTraining = async () => {
@@ -60,12 +61,15 @@ const TrainingDetail = () => {
         console.log("Training data loaded:", trainingData.title);
         setTraining(trainingData);
         
+        setLoadingProgress(true);
         // Try to load progress if it exists
         try {
           console.log("Fetching training progress for training:", id, "and user:", user.id);
           const progressData = await fetchTrainingProgress(id, user.id);
           if (progressData) {
-            console.log("Progress data loaded:", progressData.progress_pct);
+            console.log("Progress data loaded:", progressData.progress_pct, "Status:", 
+              progressData.completed_at ? "completed" : progressData.progress_pct > 0 ? "in_progress" : "not_started");
+            
             setProgress(progressData.progress_pct || 0);
             
             // Determine status based on progress
@@ -79,11 +83,15 @@ const TrainingDetail = () => {
           } else {
             console.log("No progress data found");
             setStatus("not_started");
+            setProgress(0);
           }
         } catch (error) {
           console.error("Error loading progress:", error);
           console.log("No progress data found, starting fresh");
           setStatus("not_started");
+          setProgress(0);
+        } finally {
+          setLoadingProgress(false);
         }
       } catch (error: any) {
         console.error("Error loading training:", error);
@@ -308,56 +316,64 @@ const TrainingDetail = () => {
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-medium mb-4">Seu progresso</h3>
               
-              {/* Status selector - agora com edição direta */}
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-600">Status:</span>
-                <div className="flex flex-wrap gap-2">
-                  {availableStatuses.map(statusOption => (
-                    <button
-                      key={statusOption.value}
-                      onClick={() => handleStatusChange(statusOption.value)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        status === statusOption.value
-                          ? getStatusColor(statusOption.value)
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {statusOption.label}
-                    </button>
-                  ))}
+              {loadingProgress ? (
+                <div className="flex justify-center py-4">
+                  <Loader className="h-6 w-6 animate-spin text-gray-400" />
                 </div>
-              </div>
-              
-              <div className="progress-bar mb-2 bg-gray-200 rounded-full overflow-hidden h-2">
-                <div 
-                  className={`progress-bar-fill h-full rounded-full ${
-                    status === "completed" ? "bg-green-500" : 
-                    status === "in_progress" ? "bg-blue-500" : "bg-gray-300"
-                  }`}
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-              
-              <div className="flex justify-between mt-1 text-xs text-gray-500">
-                <span>Progresso</span>
-                <span className="font-medium">{Math.round(progress)}%</span>
-              </div>
-              
-              {status === "completed" ? (
-                <div className="mt-4 text-center">
-                  <div className="inline-block p-2 bg-green-100 text-green-800 rounded-full mb-2">
-                    ✓
-                  </div>
-                  <p className="font-medium">Treinamento concluído</p>
-                </div>
-              ) : status === "in_progress" ? (
-                <p className="text-sm text-gray-500 mt-4">
-                  Continue assistindo para completar este treinamento.
-                </p>
               ) : (
-                <p className="text-sm text-gray-500 mt-4">
-                  Comece a assistir para registrar seu progresso.
-                </p>
+                <>
+                  {/* Status selector - botões diretos para seleção de status */}
+                  <div className="mb-4">
+                    <span className="text-sm text-gray-600 block mb-2">Status:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {availableStatuses.map(statusOption => (
+                        <button
+                          key={statusOption.value}
+                          onClick={() => handleStatusChange(statusOption.value)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                            status === statusOption.value
+                              ? getStatusColor(statusOption.value)
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          {statusOption.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="progress-bar mb-2 bg-gray-200 rounded-full overflow-hidden h-2">
+                    <div 
+                      className={`progress-bar-fill h-full rounded-full ${
+                        status === "completed" ? "bg-green-500" : 
+                        status === "in_progress" ? "bg-blue-500" : "bg-gray-300"
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                  
+                  <div className="flex justify-between mt-1 text-xs text-gray-500">
+                    <span>Progresso</span>
+                    <span className="font-medium">{Math.round(progress)}%</span>
+                  </div>
+                  
+                  {status === "completed" ? (
+                    <div className="mt-4 text-center">
+                      <div className="inline-block p-2 bg-green-100 text-green-800 rounded-full mb-2">
+                        ✓
+                      </div>
+                      <p className="font-medium">Treinamento concluído</p>
+                    </div>
+                  ) : status === "in_progress" ? (
+                    <p className="text-sm text-gray-500 mt-4">
+                      Continue assistindo para completar este treinamento.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-4">
+                      Comece a assistir para registrar seu progresso.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>

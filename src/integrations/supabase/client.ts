@@ -13,10 +13,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: typeof window !== 'undefined' ? localStorage : undefined
   },
   global: {
-    // Add custom headers for Storage requests
+    // Headers personalizados para requisições ao Storage
     headers: {
-      // Este cabeçalho é útil para o CDN do Supabase
-      'cache-control': 'no-cache, no-store'
+      // Desativar cache para garantir que o conteúdo mais recente seja carregado
+      'cache-control': 'no-cache, no-store, must-revalidate',
+      'pragma': 'no-cache',
+      'expires': '0'
     }
   }
 });

@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -27,18 +28,37 @@ const getYoutubeVideoId = (url: string) => {
 
 // Get proper URL for Supabase storage files
 const getProperVideoUrl = (url: string) => {
-  // If it's a complete URL, return it
+  console.log("Processing video URL:", url);
+  
+  // Para URLs completas externas, retorna diretamente
   if (url.startsWith('http://') || url.startsWith('https://')) {
+    // Se for uma URL do Supabase Storage, certifique-se de que o formato está correto
+    if (url.includes('supabase.co/storage/v1/object/public/')) {
+      console.log("Returning direct Supabase URL:", url);
+      return url;
+    }
+    console.log("Returning external URL:", url);
     return url;
   }
   
-  // If it's a storage URL that doesn't include the bucket name, add it
-  if (!url.includes('training_videos/')) {
-    return `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${url}`;
+  // Se for apenas o nome do arquivo, crie a URL completa do Supabase
+  if (!url.includes('/')) {
+    const directUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${url}`;
+    console.log("Created URL from filename:", directUrl);
+    return directUrl;
   }
   
-  // Otherwise construct a proper storage URL
-  return `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/${url}`;
+  // Se já tiver 'training_videos/' mas não o URL completo do Supabase
+  if (url.includes('training_videos/') && !url.includes('supabase.co')) {
+    const directUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/${url}`;
+    console.log("Created URL from partial path:", directUrl);
+    return directUrl;
+  }
+  
+  // Caso padrão - tente construir a URL completa do Supabase
+  const directUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${url}`;
+  console.log("Default URL construction:", directUrl);
+  return directUrl;
 };
 
 const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 0 }: VideoPlayerProps) => {
@@ -50,12 +70,13 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const [progress, setProgress] = useState(initialProgress);
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [loadAttempts, setLoadAttempts] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Set up proper video URL
   useEffect(() => {
-    if (videoType === "UPLOAD") {
+    if (videoType === "UPLOAD" && videoUrl) {
       try {
         console.log("Original video URL:", videoUrl);
         const directUrl = getProperVideoUrl(videoUrl);
@@ -151,7 +172,6 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
       setCurrentTime(videoRef.current.currentTime);
       
       const newProgress = (videoRef.current.currentTime / duration) * 100;
-      setProgress(newProgress);
       
       // Only send progress updates every ~5%
       if (Math.abs(newProgress - progress) > 5 && onProgressUpdate) {
@@ -228,35 +248,44 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const tryAlternativeUrl = async () => {
     if (videoUrl) {
       try {
+        setLoadAttempts(prev => prev + 1);
         setError("Tentando URL alternativa...");
         
-        // Lista os arquivos no bucket para debugging
-        const { data: files, error: listError } = await supabase
-          .storage
-          .from('training_videos')
-          .list();
-          
-        if (listError) {
-          console.error("Erro ao listar arquivos:", listError);
-          setError(`Não foi possível acessar o bucket: ${listError.message}`);
-          return;
-        }
-        
-        console.log("Arquivos disponíveis no bucket:", files);
-        
-        // Tenta diferentes formatos de URL
-        const fileName = videoUrl.split('/').pop() || videoUrl;
+        // Tente diferentes formatos de URL
+        let newUrl: string | null = null;
         
         // Tenta obter uma URL pública para o arquivo
-        const { data: publicData } = supabase
-          .storage
-          .from('training_videos')
-          .getPublicUrl(fileName);
+        if (loadAttempts === 0) {
+          // Primeira tentativa: tente usar a URL exata como está no banco de dados
+          newUrl = videoUrl;
+          console.log("Tentativa 1: Usando URL original:", newUrl);
+        } else if (loadAttempts === 1) {
+          // Segunda tentativa: tente obter uma URL pública usando getPublicUrl
+          const fileName = videoUrl.split('/').pop() || videoUrl;
+          const { data } = supabase.storage.from('training_videos').getPublicUrl(fileName);
+          newUrl = data.publicUrl;
+          console.log("Tentativa 2: URL gerada com getPublicUrl:", newUrl);
+        } else if (loadAttempts === 2) {
+          // Terceira tentativa: tente com o caminho completo incluindo training_videos/
+          if (!videoUrl.includes('training_videos/')) {
+            newUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${videoUrl}`;
+          } else {
+            newUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/${videoUrl}`;
+          }
+          console.log("Tentativa 3: URL com path completo:", newUrl);
+        } else {
+          // Última tentativa: use URL direta com nome do arquivo apenas
+          const fileName = videoUrl.split('/').pop() || videoUrl;
+          newUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${fileName}`;
+          console.log("Tentativa 4: URL direta com nome de arquivo:", newUrl);
+        }
         
-        if (publicData) {
-          console.log("URL pública gerada:", publicData.publicUrl);
-          setVideoSrc(publicData.publicUrl);
+        if (newUrl) {
+          console.log("Tentando URL alternativa:", newUrl);
+          setVideoSrc(newUrl);
           setError(null);
+        } else {
+          setError("Não foi possível gerar uma URL alternativa.");
         }
       } catch (err) {
         console.error("Erro ao tentar URL alternativa:", err);
@@ -301,7 +330,8 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
               onProgressUpdate(100);
             }
           }}
-          controls // Adicionando controles nativos do navegador como fallback
+          controls // Mantendo controles nativos do navegador como fallback
+          controlsList="nodownload"
           crossOrigin="anonymous"
         >
           <source src={videoSrc} type="video/mp4" />
