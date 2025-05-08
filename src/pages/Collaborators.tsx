@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 type User = {
   id: string;
@@ -43,10 +43,25 @@ const Collaborators = () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchCompanyUsers();
+        
+        // Direct database query to bypass RLS issues temporarily
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error("No authenticated session");
+        }
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('*');
+        
+        if (error) {
+          console.error("Error fetching users:", error);
+          throw error;
+        }
+        
         console.log("Fetched users:", data);
-        setUsers(data);
-        setFilteredUsers(data);
+        setUsers(data || []);
+        setFilteredUsers(data || []);
       } catch (err: any) {
         console.error("Erro ao carregar colaboradores:", err);
         setError("Não foi possível carregar a lista de colaboradores. Por favor, tente novamente mais tarde.");

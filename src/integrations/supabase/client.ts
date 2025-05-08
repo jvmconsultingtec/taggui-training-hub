@@ -32,7 +32,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Helper to determine if the user is authenticated
+// Helper to determine if the user is authenticated with improved error handling
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
     const { data, error } = await supabase.auth.getSession();

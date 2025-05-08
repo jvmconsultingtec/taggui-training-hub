@@ -119,10 +119,10 @@ const TrainingDetail = () => {
       let newStatus = status;
       if (progressPercent >= 100 && status !== "completed") {
         newStatus = "completed";
-        setStatus(newStatus);
+        setStatus(newStatus as TrainingStatusType);
       } else if (progressPercent > 0 && status === "not_started") {
         newStatus = "in_progress";
-        setStatus(newStatus);
+        setStatus(newStatus as TrainingStatusType);
       }
       
       console.log(`Updating progress to ${progressPercent}% with status ${newStatus}`);
@@ -168,14 +168,14 @@ const TrainingDetail = () => {
       setProgress(newProgress);
       
       // Send to API
-      await updateTrainingProgress(
+      const result = await updateTrainingProgress(
         id, 
         user.id, 
         newProgress, 
         newStatus === "completed"
       );
       
-      console.log(`Status updated to ${newStatus} with progress ${newProgress}%`);
+      console.log(`Status updated to ${newStatus} with progress ${newProgress}%`, result);
       
       toast({
         title: "Status atualizado",
@@ -190,17 +190,21 @@ const TrainingDetail = () => {
       });
       
       // Revert status changes on error
-      const progressData = await fetchTrainingProgress(id, user.id);
-      if (progressData) {
-        let revertStatus: TrainingStatusType = "not_started";
-        if (progressData.completed_at) {
-          revertStatus = "completed";
-        } else if (progressData.progress_pct > 0) {
-          revertStatus = "in_progress";
+      try {
+        const progressData = await fetchTrainingProgress(id, user.id);
+        if (progressData) {
+          let revertStatus: TrainingStatusType = "not_started";
+          if (progressData.completed_at) {
+            revertStatus = "completed";
+          } else if (progressData.progress_pct > 0) {
+            revertStatus = "in_progress";
+          }
+          
+          setStatus(revertStatus);
+          setProgress(progressData.progress_pct || 0);
         }
-        
-        setStatus(revertStatus);
-        setProgress(progressData.progress_pct || 0);
+      } catch (e) {
+        console.error("Error reverting status:", e);
       }
     } finally {
       setStatusChanging(false);
@@ -378,14 +382,20 @@ const TrainingDetail = () => {
                   <div className="mb-4">
                     <span className="text-sm text-gray-600 block mb-2">Status:</span>
                     <div className="flex flex-wrap gap-2">
-                      {availableStatuses.map(statusOption => (
+                      {[
+                        { value: "not_started", label: "Não iniciado" },
+                        { value: "in_progress", label: "Em andamento" },
+                        { value: "completed", label: "Concluído" }
+                      ].map(statusOption => (
                         <button
                           key={statusOption.value}
-                          onClick={() => handleStatusChange(statusOption.value)}
+                          onClick={() => handleStatusChange(statusOption.value as TrainingStatusType)}
                           disabled={statusChanging || status === statusOption.value}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                             status === statusOption.value
-                              ? getStatusColor(statusOption.value)
+                              ? status === "completed" ? "bg-green-500 text-white" : 
+                                status === "in_progress" ? "bg-blue-500 text-white" : 
+                                "bg-gray-200 text-gray-800"
                               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                           } ${statusChanging ? "opacity-50 cursor-not-allowed" : ""}`}
                           aria-pressed={status === statusOption.value}
