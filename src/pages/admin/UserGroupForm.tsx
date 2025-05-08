@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -7,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, executeRPC } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
@@ -29,21 +30,25 @@ const UserGroupForm = () => {
   const isEditMode = !!id;
   
   useEffect(() => {
-    // Get the company ID for the current user
+    // Get the company ID using the get_current_user_company_id function
     const fetchUserCompany = async () => {
       if (user?.id) {
         try {
-          const { data, error } = await supabase
-            .from("users")
-            .select("company_id")
-            .eq("id", user.id)
-            .single();
-            
-          if (error) throw error;
+          // Use the security definer function to avoid RLS recursion
+          const companyIdResult = await executeRPC<string>('get_current_user_company_id');
           
-          setCompanyId(data.company_id);
+          if (companyIdResult) {
+            setCompanyId(companyIdResult);
+          } else {
+            throw new Error("Company ID not found");
+          }
         } catch (error) {
           console.error("Error fetching company ID:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível obter informações da empresa",
+            variant: "destructive",
+          });
         }
       }
     };

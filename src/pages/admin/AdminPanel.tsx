@@ -4,10 +4,11 @@ import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Users, Video, UserPlus, Settings, BookOpen, Loader } from "lucide-react";
+import { PlusCircle, Users, Video, UserPlus, Settings, BookOpen, Loader, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, executeRPC } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Interfaces para os dados das estatísticas
 interface AdminStats {
@@ -44,58 +45,90 @@ const AdminPanel = () => {
     completionsThisMonth: 0
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Buscar estatísticas
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setLoading(true);
+        setError(null);
         
         // Início do mês atual
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const firstDayOfMonthISO = firstDayOfMonth.toISOString();
         
+        let trainingsData = [];
+        let usersData = [];
+        let groupsData = [];
+        let completedCount = 0;
+        let completionsThisMonth = 0;
+
         // Total e novos treinamentos
-        const { data: trainingsData, error: trainingsError } = await supabase
-          .from("trainings")
-          .select("id, title, created_at")
-          .order("created_at", { ascending: false });
-          
-        if (trainingsError) throw trainingsError;
+        try {
+          const { data, error } = await supabase
+            .from("trainings")
+            .select("id, title, created_at")
+            .order("created_at", { ascending: false });
+            
+          if (error) throw error;
+          trainingsData = data || [];
+        } catch (error) {
+          console.error("Erro ao buscar treinamentos:", error);
+          trainingsData = [];
+        }
         
-        // Total e novos usuários
-        const { data: usersData, error: usersError } = await supabase
-          .from("users")
-          .select("id, created_at")
-          .order("created_at", { ascending: false });
-          
-        if (usersError) throw usersError;
+        // Total e novos usuários - Use RPC function to avoid recursion
+        try {
+          // Fetch company users using the RPC function
+          const companyUsers = await executeRPC<any[]>('fetch_company_users');
+          usersData = companyUsers || [];
+        } catch (error) {
+          console.error("Erro ao buscar usuários:", error);
+          usersData = [];
+        }
         
         // Total e novos grupos
-        const { data: groupsData, error: groupsError } = await supabase
-          .from("user_groups")
-          .select("id, created_at")
-          .order("created_at", { ascending: false });
-          
-        if (groupsError) throw groupsError;
+        try {
+          const { data, error } = await supabase
+            .from("user_groups")
+            .select("id, created_at")
+            .order("created_at", { ascending: false });
+            
+          if (error) throw error;
+          groupsData = data || [];
+        } catch (error) {
+          console.error("Erro ao buscar grupos:", error);
+          groupsData = [];
+        }
         
         // Total de cursos concluídos
-        const { count: completedCount, error: completedError } = await supabase
-          .from("training_progress")
-          .select("*", { count: "exact", head: true })
-          .not("completed_at", "is", null);
-          
-        if (completedError) throw completedError;
+        try {
+          const { count, error } = await supabase
+            .from("training_progress")
+            .select("*", { count: "exact", head: true })
+            .not("completed_at", "is", null);
+            
+          if (error) throw error;
+          completedCount = count || 0;
+        } catch (error) {
+          console.error("Erro ao buscar cursos concluídos:", error);
+        }
         
         // Cursos concluídos este mês
-        const { count: completionsThisMonth, error: monthCompletionsError } = await supabase
-          .from("training_progress")
-          .select("*", { count: "exact", head: true })
-          .not("completed_at", "is", null)
-          .gte("completed_at", firstDayOfMonthISO);
-          
-        if (monthCompletionsError) throw monthCompletionsError;
+        try {
+          const { count, error } = await supabase
+            .from("training_progress")
+            .select("*", { count: "exact", head: true })
+            .not("completed_at", "is", null)
+            .gte("completed_at", firstDayOfMonthISO);
+            
+          if (error) throw error;
+          completionsThisMonth = count || 0;
+        } catch (error) {
+          console.error("Erro ao buscar conclusões mensais:", error);
+        }
         
         // Processar treinamentos recentes
         const recentTrainings = trainingsData.slice(0, 3).map(training => {
@@ -117,7 +150,7 @@ const AdminPanel = () => {
         ).length;
         
         const newUsers = usersData.filter(item => 
-          new Date(item.created_at) >= firstDayOfMonth
+          item.created_at && new Date(item.created_at) >= firstDayOfMonth
         ).length;
         
         const newGroups = groupsData.filter(item => 
@@ -129,20 +162,16 @@ const AdminPanel = () => {
           totalTrainings: trainingsData.length,
           totalUsers: usersData.length,
           totalGroups: groupsData.length,
-          completedCourses: completedCount || 0,
+          completedCourses: completedCount,
           recentTrainings,
           newTrainingsCount: newTrainings,
           newUsersCount: newUsers,
           newGroupsCount: newGroups,
-          completionsThisMonth: completionsThisMonth || 0
+          completionsThisMonth
         });
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar as estatísticas",
-          variant: "destructive",
-        });
+        setError("Não foi possível carregar as estatísticas do painel. Por favor, tente novamente mais tarde.");
       } finally {
         setLoading(false);
       }
@@ -173,6 +202,14 @@ const AdminPanel = () => {
             </Button>
           </div>
         </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -333,7 +370,15 @@ const AdminPanel = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-center text-muted-foreground py-8">
+                  <Alert className="mb-6">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Acesso por grupos</AlertTitle>
+                    <AlertDescription>
+                      Os vídeos de treinamento são liberados apenas para usuários de grupos específicos.
+                      Atribua treinamentos a grupos para controlar quem pode acessá-los.
+                    </AlertDescription>
+                  </Alert>
+                  <p className="text-center text-muted-foreground py-4">
                     Selecione "Novo Treinamento" para adicionar conteúdo ou acesse o gerenciamento de treinamentos para editar existentes.
                   </p>
                   <div className="flex justify-center">
@@ -362,7 +407,15 @@ const AdminPanel = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-center text-muted-foreground py-8">
+                  <Alert className="mb-6">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Controle de acesso</AlertTitle>
+                    <AlertDescription>
+                      Os grupos determinam quais treinamentos cada usuário pode acessar.
+                      Usuários só podem visualizar treinamentos atribuídos aos seus grupos.
+                    </AlertDescription>
+                  </Alert>
+                  <p className="text-center text-muted-foreground py-4">
                     Crie grupos para organizar usuários e atribuir treinamentos de forma eficiente.
                   </p>
                   <div className="flex justify-center">
