@@ -107,3 +107,76 @@ AS $$
   LIMIT 1;
 $$;
 
+-- Add a more reliable way to get authenticated user's company ID
+CREATE OR REPLACE FUNCTION public.get_auth_user_company_id()
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_company_id UUID;
+BEGIN
+  -- Direct query to get company_id without using RLS
+  SELECT company_id INTO v_company_id 
+  FROM public.users 
+  WHERE id = auth.uid();
+  
+  RETURN v_company_id;
+END;
+$$;
+
+-- Create a function for user groups access that doesn't recursively query the same table
+CREATE OR REPLACE FUNCTION public.can_access_user_group(group_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_user_company_id UUID;
+  v_group_company_id UUID;
+BEGIN
+  -- Get authenticated user's company ID using our helper function
+  v_user_company_id := public.get_auth_user_company_id();
+  
+  -- Get the group's company ID
+  SELECT company_id INTO v_group_company_id 
+  FROM public.user_groups 
+  WHERE id = group_id;
+  
+  -- Return true if same company
+  RETURN v_user_company_id = v_group_company_id;
+END;
+$$;
+
+-- Create a function to safely check if a user can access a group member
+CREATE OR REPLACE FUNCTION public.can_access_group_member(member_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_user_company_id UUID;
+  v_group_id UUID;
+  v_group_company_id UUID;
+BEGIN
+  -- Get authenticated user's company ID
+  v_user_company_id := public.get_auth_user_company_id();
+  
+  -- Get the group ID for this member
+  SELECT group_id INTO v_group_id 
+  FROM public.user_group_members 
+  WHERE id = member_id;
+  
+  -- Get the group's company ID
+  SELECT company_id INTO v_group_company_id 
+  FROM public.user_groups 
+  WHERE id = v_group_id;
+  
+  -- Return true if same company
+  RETURN v_user_company_id = v_group_company_id;
+END;
+$$;
+

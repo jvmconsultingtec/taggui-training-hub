@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, executeRPC } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
@@ -25,22 +25,24 @@ const UserGroupForm = () => {
   const isEditMode = !!id;
   
   useEffect(() => {
-    // First fetch the user's company ID using RPC function to avoid recursion
-    const fetchUserCompany = async () => {
+    // Obter o ID da empresa do usuário usando a função RPC segura
+    const fetchUserCompanyId = async () => {
       try {
+        setLoading(true);
         console.log("Fetching company ID using RPC function");
         
-        // Use get_current_user_company_id RPC function to avoid recursion
-        const { data, error } = await supabase.rpc('get_current_user_company_id');
+        // Usamos a função RPC get_auth_user_company_id que é SECURITY DEFINER
+        // e evita problemas de recursão
+        const companyId = await executeRPC<string>('get_auth_user_company_id');
         
-        if (error) {
-          console.error("Error fetching company ID:", error);
-          throw error;
-        }
-        
-        console.log("Company ID retrieved:", data);
-        if (data) {
-          setCompanyId(data);
+        console.log("Company ID retrieved:", companyId);
+        if (companyId) {
+          setCompanyId(companyId);
+          
+          // Se estamos em modo de edição, carregar também os dados do grupo
+          if (isEditMode) {
+            await loadGroupData();
+          }
         } else {
           throw new Error("Company ID not found");
         }
@@ -51,29 +53,32 @@ const UserGroupForm = () => {
           description: "Não foi possível obter informações da empresa",
           variant: "destructive",
         });
+      } finally {
+        setLoading(false);
       }
     };
     
-    fetchUserCompany();
-    
-    // Then load group data if in edit mode
-    if (isEditMode) {
-      loadGroupData();
-    }
-  }, [id, user?.id]);
+    fetchUserCompanyId();
+  }, [id, isEditMode]);
 
   const loadGroupData = async () => {
     try {
-      setLoading(true);
+      console.log("Loading group data for ID:", id);
       
+      // Usando query direta ao invés de RPC porque não estamos
+      // em um contexto onde recursão seria um problema
       const { data, error } = await supabase
         .from("user_groups")
         .select("*")
         .eq("id", id)
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error loading group data:", error);
+        throw error;
+      }
       
+      console.log("Group data loaded:", data);
       setName(data.name);
       setDescription(data.description || "");
     } catch (error) {
@@ -84,8 +89,6 @@ const UserGroupForm = () => {
         variant: "destructive",
       });
       navigate("/admin/groups");
-    } finally {
-      setLoading(false);
     }
   };
   

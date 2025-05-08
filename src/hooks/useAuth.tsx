@@ -34,8 +34,11 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          // Verificar se o usuário é administrador
-          checkAdminStatus();
+          // Verificar se o usuário é administrador - envolvido em setTimeout
+          // para evitar problemas de recursão durante o evento de autenticação
+          setTimeout(() => {
+            checkAdminStatus();
+          }, 0);
         } else {
           setIsAdmin(false);
           console.info("No active session found");
@@ -77,8 +80,18 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       console.log("Checking admin status in useAuth");
       
-      // Usando a função is_admin sem parâmetros (vai usar o auth.uid() internamente)
-      const { data, error } = await supabase.rpc('is_admin');
+      // Importante: precisa limpar o cache para obter resultado correto
+      // Fazemos uma chamada inicial para ignorar o cache
+      await supabase.rpc('is_admin', {}, { cache: 'no-store' });
+      
+      // Agora fazemos a chamada real
+      const { data, error } = await supabase.rpc('is_admin', {}, { 
+        headers: { 
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
         
       if (error) {
         console.error("Error checking admin status in useAuth:", error);

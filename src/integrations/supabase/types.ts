@@ -335,6 +335,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_group_member: {
+        Args: { member_id: string }
+        Returns: boolean
+      }
+      can_access_user_group: {
+        Args: { group_id: string }
+        Returns: boolean
+      }
       check_same_company_access: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -368,6 +376,10 @@ export type Database = {
           name: string
           role: Database["public"]["Enums"]["user_role"] | null
         }[]
+      }
+      get_auth_user_company_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_current_user_company_id: {
         Args: Record<PropertyKey, never>
