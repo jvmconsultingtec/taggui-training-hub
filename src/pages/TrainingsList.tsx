@@ -6,6 +6,7 @@ import Layout from "../components/layout/Layout";
 import { fetchTrainings } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 type Training = {
   id: string;
@@ -131,14 +132,30 @@ const TrainingsList = () => {
     return date.toLocaleDateString('pt-BR');
   };
 
-  const getAssignmentInfo = (training: Training) => {
-    // For demonstration purposes only
-    // In a real implementation, this would come from the API
-    return {
-      assigned: Math.floor(Math.random() * 100) + 20,
-      completed: Math.floor(Math.random() * 80),
-      completionRate: Math.floor(Math.random() * 100)
-    };
+  const getStatusInfo = (training: Training) => {
+    // For demonstration purposes - in real app this would come from API
+    // Randomly assign a status
+    const random = Math.random();
+    
+    if (random < 0.33) {
+      return {
+        status: "not_started", 
+        label: "Não iniciado",
+        color: "bg-gray-200"
+      };
+    } else if (random < 0.66) {
+      return {
+        status: "in_progress", 
+        label: "Em andamento",
+        color: "bg-blue-500 text-white"
+      };
+    } else {
+      return {
+        status: "completed", 
+        label: "Concluído",
+        color: "bg-green-500 text-white"
+      };
+    }
   };
   
   return (
@@ -220,7 +237,7 @@ const TrainingsList = () => {
                   </tr>
                 ) : filteredTrainings.length > 0 ? (
                   filteredTrainings.map((training) => {
-                    const { assigned, completed, completionRate } = getAssignmentInfo(training);
+                    const { status, label, color } = getStatusInfo(training);
                     
                     return (
                       <tr key={training.id} className="hover:bg-gray-50">
@@ -246,21 +263,7 @@ const TrainingsList = () => {
                            training.id.startsWith("4") ? "Marketing" : "Geral"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full ${
-                                  completionRate > 80 ? "bg-green-500" : 
-                                  completionRate > 50 ? "bg-amber-500" : "bg-red-500"
-                                }`}
-                                style={{ width: `${completionRate}%` }}
-                              ></div>
-                            </div>
-                            <span className="ml-2 text-xs font-medium">{completionRate}%</span>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {completed}/{assigned} concluídos
-                          </div>
+                          <Badge className={`${color}`}>{label}</Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-wrap gap-1">

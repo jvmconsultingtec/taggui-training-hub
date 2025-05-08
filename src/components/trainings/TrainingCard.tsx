@@ -106,8 +106,8 @@ const TrainingCard = (props: TrainingCardProps) => {
                 ></div>
               </div>
               <div className="flex justify-between mt-1 text-xs text-gray-500">
-                <span>Progresso</span>
-                <span className="font-medium">{Math.round(progress)}%</span>
+                <span>Status</span>
+                <span className="font-medium">{statusLabels[status]}</span>
               </div>
             </div>
           </div>

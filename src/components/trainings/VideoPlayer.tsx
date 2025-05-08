@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -24,6 +23,19 @@ const getYoutubeVideoId = (url: string) => {
   return match && match[2].length === 11 ? match[2] : null;
 };
 
+// Add public URL to Supabase storage URLs if needed
+const getProperVideoUrl = (url: string) => {
+  // If it's already a complete URL, return it
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // Otherwise treat as a storage path and construct proper URL
+  // Using Supabase URL from environment or default
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-url.supabase.co';
+  return `${supabaseUrl}/storage/v1/object/public/${url}`;
+};
+
 const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 0 }: VideoPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -32,8 +44,16 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(initialProgress);
   const [error, setError] = useState<string | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Set up proper video URL
+  useEffect(() => {
+    if (videoType === "UPLOAD") {
+      setVideoSrc(getProperVideoUrl(videoUrl));
+    }
+  }, [videoUrl, videoType]);
   
   // YouTube embed with responsive container
   if (videoType === "YOUTUBE") {
@@ -66,7 +86,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
         setError(null);
         videoRef.current.play().catch(err => {
           console.error("Error playing video:", err);
-          setError("Não foi possível reproduzir o vídeo. O formato pode não ser suportado ou o arquivo pode estar corrompido.");
+          setError(`Não foi possível reproduzir o vídeo: ${err.message}`);
         });
       }
       setIsPlaying(!isPlaying);
@@ -164,9 +184,50 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   
   // Handle errors
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-    console.error("Video error:", e);
-    setError("Ocorreu um erro ao carregar o vídeo. Verifique se o formato é suportado.");
+    console.error("Video error:", e, e.currentTarget.error);
+    const videoElement = e.currentTarget;
+    let errorMessage = "Ocorreu um erro ao carregar o vídeo.";
+    
+    if (videoElement.error) {
+      switch (videoElement.error.code) {
+        case 1:
+          errorMessage = "O vídeo foi abortado.";
+          break;
+        case 2:
+          errorMessage = "Erro de rede ao carregar o vídeo.";
+          break;
+        case 3:
+          errorMessage = "Erro de decodificação. O formato pode não ser suportado.";
+          break;
+        case 4:
+          errorMessage = "O vídeo não está disponível ou não é suportado.";
+          break;
+        default:
+          errorMessage = `Erro de reprodução (código ${videoElement.error.code}).`;
+      }
+    }
+    
+    setError(errorMessage);
     setIsPlaying(false);
+  };
+  
+  // Direct URL for public videos
+  const tryDirectUrl = () => {
+    if (videoUrl && videoType === "UPLOAD") {
+      // Try with a different URL format
+      let newUrl = videoUrl;
+      if (videoUrl.includes('storage/v1/object/public')) {
+        // If already using public path, try using authenticated path
+        newUrl = videoUrl.replace('/storage/v1/object/public', '/storage/v1/object/authenticated');
+      } else if (!videoUrl.startsWith('http')) {
+        // Try with full URL if it's a partial path
+        newUrl = `${import.meta.env.VITE_SUPABASE_URL || ''}/storage/v1/object/public/${videoUrl}`;
+      }
+      
+      console.log("Trying alternative URL:", newUrl);
+      setVideoSrc(newUrl);
+      setError(null);
+    }
   };
   
   return (
@@ -175,26 +236,37 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Erro de reprodução</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="flex flex-col">
+            <p>{error}</p>
+            <button 
+              onClick={tryDirectUrl}
+              className="text-sm font-medium text-blue-600 hover:underline mt-2 self-end"
+            >
+              Tentar URL alternativo
+            </button>
+          </AlertDescription>
         </Alert>
       )}
       
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        className="w-full h-auto"
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onError={handleVideoError}
-        onEnded={() => {
-          setIsPlaying(false);
-          if (onProgressUpdate) {
-            onProgressUpdate(100);
-          }
-        }}
-      />
+      {videoSrc && (
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          className="w-full h-auto"
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onError={handleVideoError}
+          onEnded={() => {
+            setIsPlaying(false);
+            if (onProgressUpdate) {
+              onProgressUpdate(100);
+            }
+          }}
+          crossOrigin="anonymous"
+        />
+      )}
       
       {/* Video controls - appears on hover */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">

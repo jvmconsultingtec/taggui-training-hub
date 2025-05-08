@@ -4,13 +4,13 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress as ProgressBar } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { fetchAssignedTrainings, fetchTrainingProgress } from "@/services/api";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Check, Clock, Play } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 
 type TrainingStatus = "not_started" | "in_progress" | "completed";
 
@@ -22,6 +22,12 @@ type TrainingWithProgress = {
   progress_pct: number;
   status: TrainingStatus;
   last_viewed_at?: string;
+};
+
+const statusIcons = {
+  not_started: <Clock className="h-4 w-4 mr-1" />,
+  in_progress: <Play className="h-4 w-4 mr-1" />,
+  completed: <Check className="h-4 w-4 mr-1" />
 };
 
 const Progress = () => {
@@ -86,19 +92,19 @@ const Progress = () => {
 
   const getStatusColor = (status: TrainingStatus): string => {
     switch (status) {
-      case "completed": return "default";
-      case "in_progress": return "blue";
-      case "not_started": return "secondary";
-      default: return "secondary";
+      case "completed": return "bg-green-500";
+      case "in_progress": return "bg-blue-500";
+      case "not_started": return "bg-gray-500";
+      default: return "bg-gray-500";
     }
   };
 
-  const getProgressColor = (status: TrainingStatus): string => {
+  const getBadgeVariant = (status: TrainingStatus) => {
     switch (status) {
-      case "completed": return "bg-green-500";
-      case "in_progress": return "bg-blue-500";
-      case "not_started": return "bg-gray-300";
-      default: return "bg-gray-300";
+      case "completed": return "default";
+      case "in_progress": return "secondary";
+      case "not_started": return "outline";
+      default: return "outline";
     }
   };
 
@@ -144,21 +150,26 @@ const Progress = () => {
                           {training.description && training.description.length > 100 ? "..." : ""}
                         </p>
                       </div>
-                      <Badge variant={getStatusColor(training.status) as any} className="ml-2">
-                        {getStatusLabel(training.status)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1">
-                        <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
-                          <div 
-                            className={`h-full ${getProgressColor(training.status)}`}
-                            style={{ width: `${training.progress_pct}%` }}
-                          ></div>
-                        </div>
+                      <div className="flex items-center">
+                        {statusIcons[training.status]}
+                        <Badge variant={getBadgeVariant(training.status) as any} className="ml-1">
+                          {getStatusLabel(training.status)}
+                        </Badge>
                       </div>
-                      <div className="text-sm font-medium">{Math.round(training.progress_pct)}%</div>
                     </div>
+                    
+                    {training.status !== "not_started" && (
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <Progress 
+                            value={training.progress_pct} 
+                            className={`h-2 ${getStatusColor(training.status)} bg-gray-200`} 
+                          />
+                        </div>
+                        <div className="text-sm font-medium">{Math.round(training.progress_pct)}%</div>
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between items-center text-xs text-muted-foreground">
                       <span>Duração: {training.duration_min} minutos</span>
                       {training.last_viewed_at && (
