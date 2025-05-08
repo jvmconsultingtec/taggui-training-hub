@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import TagguiLogo from "@/components/layout/TagguiLogo";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -16,7 +16,26 @@ const Login = () => {
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signIn, resetPassword, loading } = useAuth();
+  const { signIn, resetPassword, loading, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
+      navigate(returnUrl);
+    }
+  }, [user, navigate]);
+
+  // Check if there's a redirect error in the URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const errorMessage = params.get('error');
+    if (errorMessage) {
+      setError(decodeURIComponent(errorMessage));
+    }
+  }, [location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +51,7 @@ const Login = () => {
       }
     } catch (err: any) {
       console.error("Login form error:", err);
-      setError(err.message || "Ocorreu um erro. Por favor, tente novamente.");
+      setError(err?.message || "Ocorreu um erro. Por favor, tente novamente.");
     }
   };
 

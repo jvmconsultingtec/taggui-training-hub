@@ -43,9 +43,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               navigate('/login');
             } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               console.log("User signed in or token refreshed");
-              const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
-              localStorage.removeItem('returnUrl');
-              navigate(returnUrl);
+              // Use a timeout to avoid React state update conflicts
+              setTimeout(() => {
+                const returnUrl = localStorage.getItem('returnUrl') || '/dashboard';
+                localStorage.removeItem('returnUrl');
+                navigate(returnUrl);
+              }, 0);
             }
           }
         );
@@ -76,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initializeAuth();
   }, [navigate]);
 
-  // Sign in function
+  // Sign in function with improved error handling
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
@@ -91,12 +94,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error("Sign in error:", error);
-        toast({
-          title: "Erro no login",
-          description: error.message || "Verifique suas credenciais",
-          variant: "destructive"
-        });
-        return;
+        
+        // Handle specific error cases
+        if (error.message.includes("Email not confirmed")) {
+          throw new Error("Email não confirmado. Por favor, verifique sua caixa de entrada.");
+        }
+        
+        throw error;
       }
       
       if (data?.user) {
@@ -141,6 +145,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: error.message || "Verifique suas credenciais",
         variant: "destructive"
       });
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -153,6 +158,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       const companyId = "00000000-0000-0000-0000-000000000000";
       
+      // Customize the confirmation email redirect URL to use the current host
+      const redirectTo = `${window.location.origin}/login?verified=true`;
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -160,54 +168,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: {
             name,
             company_id: companyId
-          }
+          },
+          emailRedirectTo: redirectTo
         }
       });
       
       if (error) {
         console.error("Sign up error:", error);
-        toast({
-          title: "Erro no cadastro",
-          description: error.message || "Não foi possível criar a conta",
-          variant: "destructive"
-        });
-        return;
+        throw error;
       }
       
       if (data?.user) {
         console.log("User registered successfully:", data.user.id);
         
-        // Create user in public.users table
-        try {
-          const { error: insertError } = await supabase.from("users").insert({
-            id: data.user.id,
-            email: data.user.email || "",
-            name: name,
-            company_id: companyId
-          });
-          
-          if (insertError) {
-            console.error("Error creating user profile:", insertError);
-            toast({
-              title: "Erro no cadastro",
-              description: "Usuário criado, mas houve um erro ao configurar o perfil",
-              variant: "destructive"
-            });
-            return;
-          }
-          
-          console.log("User profile created in database");
-        } catch (profileError) {
-          console.error("Error creating user profile:", profileError);
+        // User profile will be created by the database trigger
+        // No need to manually create it here
+        
+        toast({
+          title: "Conta criada com sucesso",
+          description: data.session ? "Sua conta foi criada com sucesso." : "Verifique seu email para confirmar o cadastro."
+        });
+        
+        // If auto-confirmed, redirect to dashboard, otherwise to login
+        if (data.session) {
+          setTimeout(() => navigate('/dashboard'), 0);
+        } else {
+          setTimeout(() => navigate('/login'), 0);
         }
+        
+        return;
       }
-
-      toast({
-        title: "Conta criada com sucesso",
-        description: "Você já pode fazer login com suas credenciais"
-      });
-      
-      navigate('/login');
       
     } catch (error: any) {
       console.error("Unhandled sign up error:", error);
@@ -216,6 +206,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: error.message || "Não foi possível criar a conta",
         variant: "destructive"
       });
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -255,8 +246,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
+      // Use current origin for redirect URL
+      const resetRedirectTo = `${window.location.origin}/reset-password`;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: resetRedirectTo,
       });
       
       if (error) {
@@ -281,6 +275,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: error.message || "Não foi possível enviar o email de redefinição",
         variant: "destructive"
       });
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -319,6 +314,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: error.message || "Não foi possível atualizar sua senha",
         variant: "destructive"
       });
+      throw error;
     } finally {
       setLoading(false);
     }

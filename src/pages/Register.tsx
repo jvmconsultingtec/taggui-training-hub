@@ -1,23 +1,28 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import TagguiLogo from "@/components/layout/TagguiLogo";
 import { toast } from "@/hooks/use-toast";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const { signUp, loading } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (password !== confirmPassword) {
       toast({
@@ -28,7 +33,17 @@ const Register = () => {
       return;
     }
     
-    await signUp(email, password, name);
+    try {
+      await signUp(email, password, name);
+      toast({
+        title: "Conta criada com sucesso",
+        description: "Verifique seu email para confirmar o cadastro."
+      });
+      navigate('/login');
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      setError(err?.message || "Ocorreu um erro durante o cadastro. Por favor, tente novamente.");
+    }
   };
 
   return (
@@ -44,6 +59,13 @@ const Register = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome Completo</Label>
