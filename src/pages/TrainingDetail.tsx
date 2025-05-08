@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import VideoPlayer from "@/components/trainings/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, Clock, Users, Loader } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Loader } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
@@ -45,7 +45,7 @@ const TrainingDetail = () => {
         setError(null);
         console.log("Loading training with ID:", id, "User ID:", user.id);
         
-        // Verificar se a sessão é válida
+        // Check if session is valid
         console.log("Current session expires at:", new Date(session?.expires_at || 0).toLocaleString());
         console.log("Current time:", new Date().toLocaleString());
         
@@ -83,25 +83,15 @@ const TrainingDetail = () => {
               setStatus("not_started");
             }
           } else {
-            console.log("No progress data found");
+            console.log("No progress data found, initializing with not_started status");
             setStatus("not_started");
             setProgress(0);
-            
-            // Criar um registro de progresso inicial para evitar status aleatório
-            await updateTrainingProgress(id, user.id, 0, false);
           }
         } catch (error) {
           console.error("Error loading progress:", error);
-          console.log("No progress data found, starting fresh");
+          console.log("No progress data found, initializing with not_started status");
           setStatus("not_started");
           setProgress(0);
-          
-          // Criar um registro de progresso inicial para evitar status aleatório
-          try {
-            await updateTrainingProgress(id, user.id, 0, false);
-          } catch (initError) {
-            console.error("Failed to initialize progress:", initError);
-          }
         } finally {
           setLoadingProgress(false);
         }
@@ -138,6 +128,8 @@ const TrainingDetail = () => {
         setStatus(newStatus);
       }
       
+      console.log(`Attempting to update progress to ${progressPercent}% with status ${newStatus}`);
+      
       // Send to API with current status
       await updateTrainingProgress(id, user.id, progressPercent, newStatus === "completed");
       console.log(`Progress updated to ${progressPercent}% with status ${newStatus}`);
@@ -158,6 +150,8 @@ const TrainingDetail = () => {
       if (newStatus === "completed" && progress < 100) {
         setProgress(100);
       }
+      
+      console.log(`Sending update: status=${newStatus}, progress=${newProgress}%`);
       
       // Send to API
       await updateTrainingProgress(
@@ -203,7 +197,7 @@ const TrainingDetail = () => {
     }
   };
 
-  // Lista de status disponíveis para treinamentos
+  // List of available statuses for trainings
   const availableStatuses: {value: TrainingStatusType, label: string}[] = [
     { value: "not_started", label: "Não iniciado" },
     { value: "in_progress", label: "Em andamento" },
@@ -345,7 +339,7 @@ const TrainingDetail = () => {
                 </div>
               ) : (
                 <>
-                  {/* Status buttons - seleção direta sem dropdown */}
+                  {/* Status buttons - direct selection without dropdown */}
                   <div className="mb-4">
                     <span className="text-sm text-gray-600 block mb-2">Status:</span>
                     <div className="flex flex-wrap gap-2">

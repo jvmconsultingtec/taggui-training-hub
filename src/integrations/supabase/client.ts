@@ -13,11 +13,20 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: typeof window !== 'undefined' ? localStorage : undefined
   },
   global: {
-    // Cabeçalhos para garantir que conteúdo não seja cacheado
+    // Headers to ensure content is not cached
     headers: {
-      'cache-control': 'no-cache, no-store, must-revalidate',
-      'pragma': 'no-cache',
-      'expires': '0'
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  },
+  db: {
+    schema: 'public'
+  },
+  // Enable auto retries for better reliability
+  realtime: {
+    params: {
+      eventsPerSecond: 10
     }
   }
 });

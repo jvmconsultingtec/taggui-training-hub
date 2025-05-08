@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,39 +30,106 @@ const getYoutubeVideoId = (url: string) => {
 const getProperVideoUrl = (url: string) => {
   console.log("Processing video URL:", url);
   
-  // Formato URL correto para o Supabase Storage
+  // Correct URL format for Supabase Storage
   const SUPABASE_PROJECT_ID = "deudqfjiieufqenzfclv";
-  const BUCKET_NAME = "training_videos";
   
-  // Para URLs completas externas, retorna diretamente
+  // For complete external URLs, return directly
   if (url.startsWith('http://') || url.startsWith('https://')) {
     if (url.includes('supabase.co/storage/v1/object/public/')) {
-      console.log("Returning direct Supabase URL:", url);
+      console.log("Input is already a complete Supabase URL:", url);
+      
+      // Ensure the bucket name uses hyphen instead of underscore in the URL
+      if (url.includes('/training_videos/')) {
+        const correctedUrl = url.replace('/training_videos/', '/training-videos/');
+        console.log("Corrected bucket name in URL to use hyphen:", correctedUrl);
+        return correctedUrl;
+      }
+      
       return url;
     }
     console.log("Returning external URL:", url);
     return url;
   }
   
-  // Se for apenas o nome do arquivo, crie a URL completa do Supabase
+  // If just the file name, create the complete Supabase URL
   if (!url.includes('/')) {
     // Format: https://[PROJECT_ID].supabase.co/storage/v1/object/public/[BUCKET_NAME]/[FILE_PATH]
-    const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${url}`;
-    console.log("Created URL from filename:", directUrl);
+    const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${url}`;
+    console.log("Created URL from filename with hyphen bucket:", directUrl);
     return directUrl;
   }
   
-  // Se já tiver 'training_videos/' mas não o URL completo do Supabase
-  if (url.includes('training_videos/') && !url.includes('supabase.co')) {
-    const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${url}`;
+  // If it already has 'training_videos/' but not the complete Supabase URL
+  if ((url.includes('training_videos/') || url.includes('training-videos/')) && !url.includes('supabase.co')) {
+    // Ensure we're using the hyphen version in the URL
+    const pathPart = url.replace('training_videos/', 'training-videos/');
+    const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${pathPart}`;
     console.log("Created URL from partial path:", directUrl);
     return directUrl;
   }
   
-  // Caso padrão - tente construir a URL completa do Supabase
-  const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${url}`;
-  console.log("Default URL construction:", directUrl);
+  // Default case - try to build the complete Supabase URL with hyphen bucket name
+  const directUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${url}`;
+  console.log("Default URL construction with hyphen bucket:", directUrl);
   return directUrl;
+};
+
+// Generate alternative URL attempts for fallbacks
+const generateAlternativeUrls = (url: string): string[] => {
+  const alternatives: string[] = [];
+  const SUPABASE_PROJECT_ID = "deudqfjiieufqenzfclv";
+  
+  // If it's already a full URL
+  if (url.includes('supabase.co/storage/v1/object/public/')) {
+    // Try with hyphen version of bucket name
+    if (url.includes('/training_videos/')) {
+      alternatives.push(url.replace('/training_videos/', '/training-videos/'));
+    }
+    // Try with underscore version of bucket name
+    if (url.includes('/training-videos/')) {
+      alternatives.push(url.replace('/training-videos/', '/training_videos/'));
+    }
+    
+    // Try direct URL without /object/ segment
+    if (url.includes('/object/')) {
+      alternatives.push(url.replace('/object/', '/'));
+    }
+    
+    // Extract just the file path
+    const pathMatch = url.match(/public\/(training[_-]videos\/[^?#]+)/);
+    if (pathMatch && pathMatch[1]) {
+      const filePath = pathMatch[1].split('/').pop();
+      if (filePath) {
+        // Try with just the file name in both bucket formats
+        alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${filePath}`);
+        alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training_videos/${filePath}`);
+        
+        // Try with full file path in different formats
+        if (url.includes('/uploads/')) {
+          alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/uploads/${filePath}`);
+          alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training_videos/uploads/${filePath}`);
+        }
+      }
+    }
+  } else {
+    // For non-URL inputs, assume it's a file name or path
+    if (url.includes('/')) {
+      // It's a path
+      const fileName = url.split('/').pop() || '';
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${url}`);
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training_videos/${url}`);
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/uploads/${fileName}`);
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training_videos/uploads/${fileName}`);
+    } else {
+      // It's just a filename
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${url}`);
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training_videos/${url}`);
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/uploads/${url}`);
+      alternatives.push(`https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training_videos/uploads/${url}`);
+    }
+  }
+  
+  return alternatives;
 };
 
 const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 0 }: VideoPlayerProps) => {
@@ -74,6 +142,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [loadAttempts, setLoadAttempts] = useState(0);
+  const [alternativeUrls, setAlternativeUrls] = useState<string[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -85,6 +154,11 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
         const directUrl = getProperVideoUrl(videoUrl);
         console.log("Attempting to load video from:", directUrl);
         setVideoSrc(directUrl);
+        
+        // Generate alternative URLs for fallbacks
+        const altUrls = generateAlternativeUrls(videoUrl);
+        console.log("Generated alternative URLs:", altUrls);
+        setAlternativeUrls(altUrls);
       } catch (err) {
         console.error("Error setting up video URL:", err);
         setError("Erro ao processar URL do vídeo");
@@ -255,55 +329,24 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   
   // Try alternative URL
   const tryAlternativeUrl = async () => {
-    if (videoUrl) {
+    if (alternativeUrls.length > 0) {
       try {
+        const currentAttempt = loadAttempts % alternativeUrls.length;
+        const newUrl = alternativeUrls[currentAttempt];
+        
         setLoadAttempts(prev => prev + 1);
-        setError("Tentando URL alternativa...");
+        setError(`Tentando URL alternativa... (${currentAttempt + 1}/${alternativeUrls.length})`);
         
-        // Tente diferentes formatos de URL
-        let newUrl: string | null = null;
+        console.log(`Trying alternative URL ${currentAttempt + 1}/${alternativeUrls.length}:`, newUrl);
         
-        // Formatting the URL correctly for Supabase Storage
-        const SUPABASE_PROJECT_ID = "deudqfjiieufqenzfclv";
-        const BUCKET_NAME = "training_videos";
-        
-        if (loadAttempts === 0) {
-          // Try original URL but make sure it has correct Supabase URL format
-          newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${videoUrl.split('/').pop()}`;
-          console.log("Tentativa 1: URL formatada para Supabase:", newUrl);
-        } else if (loadAttempts === 1) {
-          // Try using the getPublicUrl method
-          const fileName = videoUrl.split('/').pop() || videoUrl;
-          const { data } = supabase.storage.from('training_videos').getPublicUrl(fileName);
-          newUrl = data.publicUrl;
-          console.log("Tentativa 2: URL gerada com getPublicUrl:", newUrl);
-        } else if (loadAttempts === 2) {
-          // Try with the full path including uploads/
-          const fileName = videoUrl.split('/').pop() || videoUrl;
-          if (!fileName.includes('uploads/')) {
-            newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/uploads/${fileName}`;
-          } else {
-            newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}/${fileName}`;
-          }
-          console.log("Tentativa 3: URL com path completo:", newUrl);
-        } else {
-          // Last attempt: try different bucket name format (with hyphen)
-          const fileName = videoUrl.split('/').pop() || videoUrl;
-          newUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/storage/v1/object/public/training-videos/${fileName}`;
-          console.log("Tentativa 4: URL com nome de bucket alternativo:", newUrl);
-        }
-        
-        if (newUrl) {
-          console.log("Tentando URL alternativa:", newUrl);
-          setVideoSrc(newUrl);
-          setError(null);
-        } else {
-          setError("Não foi possível gerar uma URL alternativa.");
-        }
+        setVideoSrc(newUrl);
+        setError(null);
       } catch (err) {
         console.error("Erro ao tentar URL alternativa:", err);
         setError("Não foi possível carregar o vídeo de forma alternativa.");
       }
+    } else {
+      setError("Não há URLs alternativas disponíveis para tentar.");
     }
   };
   
@@ -321,7 +364,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
                 variant="secondary"
                 size="sm"
               >
-                Tentar URL alternativo
+                Tentar URL alternativa
               </Button>
             </div>
           </AlertDescription>
@@ -343,9 +386,10 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
               onProgressUpdate(100);
             }
           }}
-          controls // Mantendo controles nativos do navegador como fallback
+          controls // Keep native browser controls as fallback
           controlsList="nodownload"
           crossOrigin="anonymous"
+          playsInline
         >
           <source src={videoSrc} type="video/mp4" />
           <p>Seu navegador não suporta a reprodução de vídeos.</p>
@@ -365,7 +409,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
             className="w-full h-1 bg-gray-300 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
           />
           <div 
-            className="absolute top-0 left-0 h-1 bg-taggui-primary rounded-full pointer-events-none"
+            className="absolute top-0 left-0 h-1 bg-primary rounded-full pointer-events-none"
             style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
           ></div>
         </div>

@@ -55,35 +55,54 @@ export const ensureTrainingVideosBucket = async () => {
     
     console.log("Available buckets:", buckets);
     
-    // Note: The bucket might be named 'training_videos' in the database but 'training-videos' in URLs
-    const bucketExists = buckets?.some(bucket => bucket.name === 'training_videos');
+    // Check for both variations of the bucket name
+    const bucketExists = buckets?.some(bucket => 
+      bucket.name === 'training_videos' || bucket.name === 'training-videos'
+    );
     
     if (!bucketExists) {
-      // Create bucket
-      console.log("Bucket 'training_videos' not found, creating it...");
-      const { data, error } = await supabase.storage.createBucket('training_videos', {
+      // Create bucket - try with hyphen format as that seems to be working better
+      console.log("Bucket not found, creating it...");
+      const { data, error } = await supabase.storage.createBucket('training-videos', {
         public: true,
         fileSizeLimit: 52428800, // 50MB
       });
       
       if (error) {
-        console.error("Error creating training_videos bucket:", error);
+        console.error("Error creating bucket:", error);
       } else {
-        console.log("Created training_videos bucket:", data);
+        console.log("Created bucket:", data);
       }
     } else {
-      console.log("Bucket 'training_videos' already exists");
+      console.log("Bucket already exists");
       
       // Update bucket to ensure it's public
-      const { error: updateError } = await supabase.storage.updateBucket('training_videos', {
-        public: true,
-        fileSizeLimit: 52428800, // 50MB
-      });
-      
-      if (updateError) {
-        console.error("Error updating bucket to public:", updateError);
-      } else {
-        console.log("Updated training_videos bucket to be public");
+      try {
+        // Try both naming formats since we're not sure which one exists
+        const { error: updateError } = await supabase.storage.updateBucket('training-videos', {
+          public: true,
+          fileSizeLimit: 52428800, // 50MB
+        });
+        
+        if (updateError) {
+          console.error("Error updating bucket with hyphen to public:", updateError);
+          
+          // Try with underscore naming
+          const { error: updateError2 } = await supabase.storage.updateBucket('training_videos', {
+            public: true,
+            fileSizeLimit: 52428800, // 50MB
+          });
+          
+          if (updateError2) {
+            console.error("Error updating bucket with underscore to public:", updateError2);
+          } else {
+            console.log("Updated training_videos bucket to be public");
+          }
+        } else {
+          console.log("Updated training-videos bucket to be public");
+        }
+      } catch (err) {
+        console.error("Error updating bucket:", err);
       }
     }
   } catch (error) {
@@ -337,7 +356,16 @@ export const fetchTrainingProgress = async (trainingId: string, userId: string) 
 export const updateTrainingProgress = async (trainingId: string, userId: string, progressPct: number, completed: boolean = false) => {
   try {
     // Check if progress record exists
-    const existingProgress = await fetchTrainingProgress(trainingId, userId);
+    const { data: existingProgress, error: checkError } = await supabase
+      .from("training_progress")
+      .select("*")
+      .eq("training_id", trainingId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error("Error checking for existing progress:", checkError);
+    }
     
     // Prepare data for update or create
     const updates: any = {
@@ -361,24 +389,26 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
       const { data, error } = await supabase
         .from("training_progress")
         .update(updates)
-        .eq("training_id", trainingId)
-        .eq("user_id", userId)
+        .eq("id", existingProgress.id)
         .select();
       
       if (error) throw error;
       return data;
     } else {
-      // Create new record
+      // Create new record - use upsert instead of insert to prevent duplicate key errors
       const { data, error } = await supabase
         .from("training_progress")
-        .insert({
+        .upsert({
           training_id: trainingId,
           user_id: userId,
           ...updates
         })
         .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error upserting training progress:", error);
+        throw error;
+      }
       return data;
     }
   } catch (error) {
@@ -436,13 +466,23 @@ export const uploadTrainingVideo = async (file: File) => {
         
         console.log(`Uploading chunk ${i+1}/${chunks} (${start}-${end} of ${file.size})`);
         
+        // Try upload with hyphen format first
         const { error: uploadError } = await supabase.storage
-          .from('training_videos')
+          .from('training-videos')
           .upload(fileName, chunk, uploadOptions);
           
         if (uploadError) {
-          console.error(`Error uploading chunk ${i+1}:`, uploadError);
-          throw uploadError;
+          console.error(`Error uploading chunk ${i+1} to training-videos:`, uploadError);
+          
+          // Try with underscore format as fallback
+          const { error: uploadError2 } = await supabase.storage
+            .from('training_videos')
+            .upload(fileName, chunk, uploadOptions);
+            
+          if (uploadError2) {
+            console.error(`Error uploading chunk ${i+1} to training_videos:`, uploadError2);
+            throw uploadError2;
+          }
         }
         
         uploadedChunks++;
@@ -451,30 +491,56 @@ export const uploadTrainingVideo = async (file: File) => {
       
       console.log("All chunks uploaded successfully");
     } else {
-      // For smaller files, use standard upload
+      // For smaller files, use standard upload - try hyphen format first
       const { data, error } = await supabase.storage
-        .from('training_videos')
+        .from('training-videos')
         .upload(fileName, file);
       
       if (error) {
-        console.error("Upload error:", error);
-        throw error;
+        console.error("Upload error with hyphen format:", error);
+        
+        // Try with underscore format as fallback
+        const { data: data2, error: error2 } = await supabase.storage
+          .from('training_videos')
+          .upload(fileName, file);
+        
+        if (error2) {
+          console.error("Upload error with underscore format:", error2);
+          throw error2;
+        }
+        
+        console.log("Upload successful with underscore format:", data2);
+      } else {
+        console.log("Upload successful with hyphen format:", data);
       }
-      
-      console.log("Upload successful:", data);
     }
     
-    // Generate the correct public URL format
-    const publicUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${fileName}`;
+    // Generate the correct public URL format - with hyphen
+    const publicUrl = `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training-videos/${fileName}`;
     
-    console.log("Generated public URL:", publicUrl);
+    console.log("Generated public URL with hyphen:", publicUrl);
     
     // Also try getting the URL through the official method to confirm it works
-    const { data: urlData } = supabase.storage
-      .from('training_videos')
-      .getPublicUrl(fileName);
-    
-    console.log("Official public URL method:", urlData.publicUrl);
+    try {
+      const { data: urlData } = supabase.storage
+        .from('training-videos')
+        .getPublicUrl(fileName);
+      
+      console.log("Official public URL method (hyphen):", urlData.publicUrl);
+    } catch (err) {
+      console.error("Error getting public URL with hyphen format:", err);
+      
+      try {
+        // Try underscore format
+        const { data: urlData2 } = supabase.storage
+          .from('training_videos')
+          .getPublicUrl(fileName);
+        
+        console.log("Official public URL method (underscore):", urlData2.publicUrl);
+      } catch (err2) {
+        console.error("Error getting public URL with underscore format:", err2);
+      }
+    }
     
     // Return the URL that matches the required format
     return publicUrl;
