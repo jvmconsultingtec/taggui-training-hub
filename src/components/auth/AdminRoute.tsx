@@ -24,7 +24,7 @@ export const AdminRoute = () => {
         
         if (error) throw error;
         
-        console.log("Is user admin?", isAdminResult);
+        console.log("AdminRoute - Is user admin?", isAdminResult);
         setIsAdmin(isAdminResult);
       } catch (error) {
         console.error("Erro ao verificar permissões:", error);

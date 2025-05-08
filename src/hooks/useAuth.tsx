@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
@@ -75,17 +74,15 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   // Função para verificar se o usuário é administrador
   const checkAdminStatus = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", userId)
-        .single();
+      // Use the direct RPC function to avoid recursion issues
+      const { data, error } = await supabase.rpc('is_admin');
         
       if (error) {
-        console.error("Error checking admin status:", error);
+        console.error("Error checking admin status in useAuth:", error);
         setIsAdmin(false);
       } else {
-        setIsAdmin(data.role === "ADMIN");
+        console.log("useAuth - Is user admin?", data);
+        setIsAdmin(!!data);
       }
       
       setLoading(false);
@@ -174,7 +171,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     signUp,
     signOut,
     resetPassword,
-    updatePassword, // Add it to the context value
+    updatePassword, 
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

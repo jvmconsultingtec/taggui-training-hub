@@ -14,7 +14,8 @@ import {
   ShieldCheck
 } from "lucide-react";
 import TagguiLogo from "./TagguiLogo";
-import { supabase, executeRPC } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type NavItemProps = {
   to: string;
@@ -44,22 +45,36 @@ const Sidebar = () => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const { user, isAdmin: authIsAdmin } = useAuth();
   
   const isActive = (path: string) => location.pathname.startsWith(path);
   
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        const isAdminResult = await executeRPC<boolean>('is_admin');
-        setIsAdmin(!!isAdminResult);
+        // Use the auth context's isAdmin value first
+        if (authIsAdmin) {
+          setIsAdmin(true);
+          return;
+        }
+        
+        // Fallback to direct check if needed
+        if (user) {
+          const { data, error } = await supabase.rpc('is_admin');
+          
+          if (error) throw error;
+          
+          console.log("Sidebar - Is user admin?", data);
+          setIsAdmin(!!data);
+        }
       } catch (error) {
-        console.error("Erro ao verificar status de admin:", error);
+        console.error("Erro ao verificar status de admin no Sidebar:", error);
         setIsAdmin(false);
       }
     };
     
     checkAdminStatus();
-  }, []);
+  }, [user, authIsAdmin]);
   
   return (
     <div 
