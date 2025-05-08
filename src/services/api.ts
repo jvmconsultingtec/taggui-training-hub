@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -294,10 +293,15 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
     const updates = {
       progress_pct: progressPct,
       last_viewed_at: new Date().toISOString(),
-      ...(completed ? { completed_at: new Date().toISOString() } : {})
+      ...(completed && !existingProgress?.completed_at ? { completed_at: new Date().toISOString() } : {})
     };
     
     if (existingProgress) {
+      // Don't overwrite completed_at if already completed
+      if (existingProgress.completed_at && completed) {
+        delete updates.completed_at;
+      }
+      
       // Update existing record
       const { data, error } = await supabase
         .from("training_progress")
@@ -367,16 +371,50 @@ export const uploadTrainingVideo = async (file: File) => {
       console.log("Available buckets:", buckets);
     }
     
-    const { data, error } = await supabase.storage
-      .from('training_videos')
-      .upload(filePath, file);
-    
-    if (error) {
-      console.error("Upload error:", error);
-      throw error;
+    // For large files, use a chunked upload approach
+    if (file.size > 5 * 1024 * 1024) { // For files larger than 5MB
+      console.log("Using chunked upload for large file");
+      
+      const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+      const chunks = Math.ceil(file.size / chunkSize);
+      let uploadedChunks = 0;
+      
+      for (let i = 0; i < chunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(file.size, start + chunkSize);
+        const chunk = file.slice(start, end);
+        
+        const uploadOptions = i > 0 ? { upsert: true } : undefined;
+        
+        console.log(`Uploading chunk ${i+1}/${chunks} (${start}-${end} of ${file.size})`);
+        
+        const { error: uploadError } = await supabase.storage
+          .from('training_videos')
+          .upload(filePath, chunk, uploadOptions);
+          
+        if (uploadError) {
+          console.error(`Error uploading chunk ${i+1}:`, uploadError);
+          throw uploadError;
+        }
+        
+        uploadedChunks++;
+        console.log(`Chunk ${uploadedChunks}/${chunks} uploaded successfully`);
+      }
+      
+      console.log("All chunks uploaded successfully");
+    } else {
+      // For smaller files, use standard upload
+      const { data, error } = await supabase.storage
+        .from('training_videos')
+        .upload(filePath, file);
+      
+      if (error) {
+        console.error("Upload error:", error);
+        throw error;
+      }
+      
+      console.log("Upload successful:", data);
     }
-    
-    console.log("Upload successful:", data);
     
     const { data: urlData } = supabase.storage
       .from('training_videos')

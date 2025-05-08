@@ -2,7 +2,7 @@
 import { Check, Clock, Play } from "lucide-react";
 import { Link } from "react-router-dom";
 
-export type TrainingStatus = "pending" | "inprogress" | "completed" | "overdue";
+export type TrainingStatus = "not_started" | "in_progress" | "completed";
 
 export interface TrainingCardProps {
   id?: string;
@@ -23,17 +23,21 @@ export interface TrainingCardProps {
 }
 
 const statusIcons = {
-  pending: <Clock className="h-4 w-4" />,
-  inprogress: <Play className="h-4 w-4" />,
-  completed: <Check className="h-4 w-4" />,
-  overdue: <Clock className="h-4 w-4" />
+  not_started: <Clock className="h-4 w-4" />,
+  in_progress: <Play className="h-4 w-4" />,
+  completed: <Check className="h-4 w-4" />
 };
 
 const statusLabels = {
-  pending: "Pendente",
-  inprogress: "Em andamento",
-  completed: "Concluído",
-  overdue: "Atrasado"
+  not_started: "Não iniciado",
+  in_progress: "Em andamento",
+  completed: "Concluído"
+};
+
+const statusColors = {
+  not_started: "bg-gray-200 text-gray-800",
+  in_progress: "bg-blue-500 text-white",
+  completed: "bg-green-500 text-white"
 };
 
 const TrainingCard = (props: TrainingCardProps) => {
@@ -44,7 +48,7 @@ const TrainingCard = (props: TrainingCardProps) => {
     description = props.training?.description,
     duration = props.training?.duration_min,
     progress = 0,
-    status = "pending",
+    status = "not_started",
     thumbnailUrl
   } = props;
 
@@ -81,7 +85,7 @@ const TrainingCard = (props: TrainingCardProps) => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-gray-900 group-hover:text-taggui-primary transition-colors">{title}</h3>
-              <span className={`status-badge ${status}`}>
+              <span className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${statusColors[status]}`}>
                 {statusIcons[status]}
                 <span>{statusLabels[status]}</span>
               </span>
@@ -92,15 +96,18 @@ const TrainingCard = (props: TrainingCardProps) => {
             )}
             
             <div className="pt-1">
-              <div className="progress-bar">
+              <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
                 <div 
-                  className="progress-bar-fill bg-taggui-primary" 
+                  className={`h-full rounded-full ${
+                    status === "completed" ? "bg-green-500" : 
+                    status === "in_progress" ? "bg-blue-500" : "bg-gray-300"
+                  }`}
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
               <div className="flex justify-between mt-1 text-xs text-gray-500">
                 <span>Progresso</span>
-                <span className="font-medium">{progress}%</span>
+                <span className="font-medium">{Math.round(progress)}%</span>
               </div>
             </div>
           </div>

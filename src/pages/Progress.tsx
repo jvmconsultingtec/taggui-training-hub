@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,13 +12,15 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+type TrainingStatus = "not_started" | "in_progress" | "completed";
+
 type TrainingWithProgress = {
   id: string;
   title: string;
   description: string | null;
   duration_min: number;
   progress_pct: number;
-  completed: boolean;
+  status: TrainingStatus;
   last_viewed_at?: string;
 };
 
@@ -41,13 +43,21 @@ const Progress = () => {
         const trainingWithProgressPromises = assignments.map(async (assignment) => {
           const progress = await fetchTrainingProgress(assignment.training.id, user.id);
           
+          // Determine status
+          let status: TrainingStatus = "not_started";
+          if (progress?.completed_at) {
+            status = "completed";
+          } else if (progress?.progress_pct > 0) {
+            status = "in_progress";
+          }
+          
           return {
             id: assignment.training.id,
             title: assignment.training.title,
             description: assignment.training.description,
             duration_min: assignment.training.duration_min,
             progress_pct: progress?.progress_pct || 0,
-            completed: progress?.completed_at !== null,
+            status: status,
             last_viewed_at: progress?.last_viewed_at,
           };
         });
@@ -65,16 +75,31 @@ const Progress = () => {
     loadTrainingsWithProgress();
   }, [user]);
 
-  const getProgressStatus = (training: TrainingWithProgress) => {
-    if (training.completed) return "Concluído";
-    if (training.progress_pct > 0) return "Em andamento";
-    return "Não iniciado";
+  const getStatusLabel = (status: TrainingStatus) => {
+    switch (status) {
+      case "completed": return "Concluído";
+      case "in_progress": return "Em andamento";
+      case "not_started": return "Não iniciado";
+      default: return "Desconhecido";
+    }
   };
 
-  const getProgressColor = (training: TrainingWithProgress) => {
-    if (training.completed) return "bg-green-500";
-    if (training.progress_pct > 0) return "bg-blue-500";
-    return "bg-gray-300";
+  const getStatusColor = (status: TrainingStatus): string => {
+    switch (status) {
+      case "completed": return "default";
+      case "in_progress": return "blue";
+      case "not_started": return "secondary";
+      default: return "secondary";
+    }
+  };
+
+  const getProgressColor = (status: TrainingStatus): string => {
+    switch (status) {
+      case "completed": return "bg-green-500";
+      case "in_progress": return "bg-blue-500";
+      case "not_started": return "bg-gray-300";
+      default: return "bg-gray-300";
+    }
   };
 
   const handleViewDashboard = () => {
@@ -111,21 +136,28 @@ const Progress = () => {
                   <div key={training.id} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-medium">{training.title}</h3>
+                        <Link to={`/trainings/${training.id}`} className="hover:underline">
+                          <h3 className="font-medium">{training.title}</h3>
+                        </Link>
                         <p className="text-sm text-muted-foreground">
                           {training.description?.substring(0, 100) || "Sem descrição"}
                           {training.description && training.description.length > 100 ? "..." : ""}
                         </p>
                       </div>
-                      <Badge variant={training.completed ? "default" : "outline"} className="ml-2">
-                        {getProgressStatus(training)}
+                      <Badge variant={getStatusColor(training.status) as any} className="ml-2">
+                        {getStatusLabel(training.status)}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="flex-1">
-                        <ProgressBar value={training.progress_pct} className={getProgressColor(training)} />
+                        <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                          <div 
+                            className={`h-full ${getProgressColor(training.status)}`}
+                            style={{ width: `${training.progress_pct}%` }}
+                          ></div>
+                        </div>
                       </div>
-                      <div className="text-sm font-medium">{training.progress_pct}%</div>
+                      <div className="text-sm font-medium">{Math.round(training.progress_pct)}%</div>
                     </div>
                     <div className="flex justify-between items-center text-xs text-muted-foreground">
                       <span>Duração: {training.duration_min} minutos</span>

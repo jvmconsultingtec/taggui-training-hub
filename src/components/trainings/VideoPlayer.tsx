@@ -1,5 +1,7 @@
+
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface VideoPlayerProps {
   videoUrl: string;
@@ -29,6 +31,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(initialProgress);
+  const [error, setError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   
@@ -59,7 +62,12 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
       if (isPlaying) {
         videoRef.current.pause();
       } else {
-        videoRef.current.play();
+        // Reset error state when trying to play
+        setError(null);
+        videoRef.current.play().catch(err => {
+          console.error("Error playing video:", err);
+          setError("Não foi possível reproduzir o vídeo. O formato pode não ser suportado ou o arquivo pode estar corrompido.");
+        });
       }
       setIsPlaying(!isPlaying);
     }
@@ -154,8 +162,23 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
     }
   };
   
+  // Handle errors
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.error("Video error:", e);
+    setError("Ocorreu um erro ao carregar o vídeo. Verifique se o formato é suportado.");
+    setIsPlaying(false);
+  };
+  
   return (
     <div className="relative group bg-black rounded-lg overflow-hidden">
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro de reprodução</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
       <video
         ref={videoRef}
         src={videoUrl}
@@ -164,6 +187,7 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
         onLoadedMetadata={handleLoadedMetadata}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        onError={handleVideoError}
         onEnded={() => {
           setIsPlaying(false);
           if (onProgressUpdate) {

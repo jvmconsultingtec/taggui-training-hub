@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import VideoPlayer from "@/components/trainings/VideoPlayer";
@@ -9,6 +10,9 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+
+export type TrainingStatusType = "not_started" | "in_progress" | "completed";
 
 const TrainingDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +21,7 @@ const TrainingDetail = () => {
   const [loading, setLoading] = useState(true);
   const [training, setTraining] = useState<any>(null);
   const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState<TrainingStatusType>("not_started");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,12 +67,23 @@ const TrainingDetail = () => {
           if (progressData) {
             console.log("Progress data loaded:", progressData.progress_pct);
             setProgress(progressData.progress_pct || 0);
+            
+            // Determine status based on progress
+            if (progressData.completed_at) {
+              setStatus("completed");
+            } else if (progressData.progress_pct > 0) {
+              setStatus("in_progress");
+            } else {
+              setStatus("not_started");
+            }
           } else {
             console.log("No progress data found");
+            setStatus("not_started");
           }
         } catch (error) {
           console.error("Error loading progress:", error);
           console.log("No progress data found, starting fresh");
+          setStatus("not_started");
         }
       } catch (error: any) {
         console.error("Error loading training:", error);
@@ -89,11 +105,27 @@ const TrainingDetail = () => {
     if (!id || !user) return;
     
     try {
-      const isCompleted = progressPercent >= 95; // Consider completed when 95% watched
-      await updateTrainingProgress(id, user.id, progressPercent, isCompleted);
+      // Update local progress
       setProgress(progressPercent);
       
-      if (isCompleted) {
+      // Determine training status
+      let newStatus = status;
+      let isCompleted = false;
+      
+      if (progressPercent >= 95) {
+        // Consider completed when 95% watched
+        newStatus = "completed";
+        isCompleted = true;
+      } else if (progressPercent > 0) {
+        newStatus = "in_progress";
+      }
+      
+      setStatus(newStatus);
+      
+      // Send to API
+      await updateTrainingProgress(id, user.id, progressPercent, isCompleted);
+      
+      if (isCompleted && status !== "completed") {
         toast({
           title: "Treinamento concluído!",
           description: "Parabéns por finalizar este treinamento"
@@ -101,6 +133,24 @@ const TrainingDetail = () => {
       }
     } catch (error) {
       console.error("Error updating progress:", error);
+    }
+  };
+
+  const getStatusLabel = (status: TrainingStatusType) => {
+    switch (status) {
+      case "completed": return "Concluído";
+      case "in_progress": return "Em andamento";
+      case "not_started": return "Não iniciado";
+      default: return "Desconhecido";
+    }
+  };
+
+  const getStatusColor = (status: TrainingStatusType) => {
+    switch (status) {
+      case "completed": return "bg-green-500 text-white";
+      case "in_progress": return "bg-blue-500 text-white";
+      case "not_started": return "bg-gray-200 text-gray-800";
+      default: return "bg-gray-200";
     }
   };
 
@@ -165,14 +215,15 @@ const TrainingDetail = () => {
     <Layout>
       <div className="container mx-auto py-6 space-y-6">
         <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/dashboard")}
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-          </Button>
+          <Link to="/dashboard">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-4"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+            </Button>
+          </Link>
           
           <h1 className="text-2xl font-bold">{training.title}</h1>
         </div>
@@ -196,6 +247,7 @@ const TrainingDetail = () => {
               videoUrl={training.video_url} 
               videoType={training.video_type}
               onProgressUpdate={handleProgressUpdate}
+              initialProgress={progress}
             />
           )}
         </div>
@@ -231,27 +283,42 @@ const TrainingDetail = () => {
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h3 className="text-lg font-medium mb-4">Seu progresso</h3>
               
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-600">Status:</span>
+                <Badge className={`${getStatusColor(status)}`}>
+                  {getStatusLabel(status)}
+                </Badge>
+              </div>
+              
               <div className="progress-bar mb-2 bg-gray-200 rounded-full overflow-hidden h-2">
                 <div 
-                  className="progress-bar-fill bg-taggui-primary h-full rounded-full" 
+                  className={`progress-bar-fill h-full rounded-full ${
+                    status === "completed" ? "bg-green-500" : 
+                    status === "in_progress" ? "bg-blue-500" : "bg-gray-300"
+                  }`}
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
-              <div className="flex justify-between text-sm text-gray-500">
+              
+              <div className="flex justify-between mt-1 text-xs text-gray-500">
                 <span>Progresso</span>
                 <span className="font-medium">{Math.round(progress)}%</span>
               </div>
               
-              {progress >= 95 ? (
+              {status === "completed" ? (
                 <div className="mt-4 text-center">
                   <div className="inline-block p-2 bg-green-100 text-green-800 rounded-full mb-2">
                     ✓
                   </div>
                   <p className="font-medium">Treinamento concluído</p>
                 </div>
-              ) : (
+              ) : status === "in_progress" ? (
                 <p className="text-sm text-gray-500 mt-4">
                   Continue assistindo para completar este treinamento.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-4">
+                  Comece a assistir para registrar seu progresso.
                 </p>
               )}
             </div>
