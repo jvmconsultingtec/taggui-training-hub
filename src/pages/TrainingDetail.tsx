@@ -5,12 +5,19 @@ import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/layout/Layout";
 import VideoPlayer from "@/components/trainings/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, Clock, Users, Loader } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Users, Loader, Edit, Check } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { fetchTrainingById, fetchTrainingProgress, updateTrainingProgress } from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type TrainingStatusType = "not_started" | "in_progress" | "completed";
 
@@ -23,6 +30,7 @@ const TrainingDetail = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<TrainingStatusType>("not_started");
   const [error, setError] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState(false);
 
   useEffect(() => {
     const loadTraining = async () => {
@@ -108,31 +116,51 @@ const TrainingDetail = () => {
       // Update local progress
       setProgress(progressPercent);
       
-      // Determine training status
-      let newStatus = status;
-      let isCompleted = false;
+      // Note: We don't change status automatically based on progress now
+      // Status is managed separately through the status selector
       
-      if (progressPercent >= 95) {
-        // Consider completed when 95% watched
-        newStatus = "completed";
-        isCompleted = true;
-      } else if (progressPercent > 0) {
-        newStatus = "in_progress";
-      }
-      
-      setStatus(newStatus);
-      
-      // Send to API
-      await updateTrainingProgress(id, user.id, progressPercent, isCompleted);
-      
-      if (isCompleted && status !== "completed") {
-        toast({
-          title: "Treinamento concluído!",
-          description: "Parabéns por finalizar este treinamento"
-        });
-      }
+      // Send to API with current status
+      await updateTrainingProgress(id, user.id, progressPercent, status === "completed");
     } catch (error) {
       console.error("Error updating progress:", error);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: TrainingStatusType) => {
+    if (!id || !user) return;
+    
+    try {
+      setStatus(newStatus);
+      
+      // For completed status, set progress to 100%
+      const newProgress = newStatus === "completed" ? 100 : progress;
+      if (newStatus === "completed" && progress < 100) {
+        setProgress(100);
+      }
+      
+      // Send to API
+      await updateTrainingProgress(
+        id, 
+        user.id, 
+        newProgress, 
+        newStatus === "completed"
+      );
+      
+      if (newStatus === "completed") {
+        toast({
+          title: "Status atualizado",
+          description: "Treinamento marcado como concluído"
+        });
+      }
+      
+      setEditingStatus(false);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status",
+        variant: "destructive"
+      });
     }
   };
 
@@ -285,9 +313,43 @@ const TrainingDetail = () => {
               
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm text-gray-600">Status:</span>
-                <Badge className={`${getStatusColor(status)}`}>
-                  {getStatusLabel(status)}
-                </Badge>
+                {editingStatus ? (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={status}
+                      onValueChange={(value) => handleStatusChange(value as TrainingStatusType)}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_started">Não iniciado</SelectItem>
+                        <SelectItem value="in_progress">Em andamento</SelectItem>
+                        <SelectItem value="completed">Concluído</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditingStatus(false)}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Badge className={`${getStatusColor(status)}`}>
+                      {getStatusLabel(status)}
+                    </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditingStatus(true)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
               
               <div className="progress-bar mb-2 bg-gray-200 rounded-full overflow-hidden h-2">

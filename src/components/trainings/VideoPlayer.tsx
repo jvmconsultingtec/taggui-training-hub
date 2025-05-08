@@ -1,6 +1,8 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 interface VideoPlayerProps {
   videoUrl: string;
@@ -32,7 +34,7 @@ const getProperVideoUrl = (url: string) => {
   
   // Otherwise treat as a storage path and construct proper URL
   // Using Supabase URL from environment or default
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-url.supabase.co';
+  const supabaseUrl = "https://deudqfjiieufqenzfclv.supabase.co";
   return `${supabaseUrl}/storage/v1/object/public/${url}`;
 };
 
@@ -45,13 +47,31 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
   const [progress, setProgress] = useState(initialProgress);
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [availableFormats, setAvailableFormats] = useState<string[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Set up proper video URL
   useEffect(() => {
     if (videoType === "UPLOAD") {
-      setVideoSrc(getProperVideoUrl(videoUrl));
+      try {
+        const directUrl = getProperVideoUrl(videoUrl);
+        console.log("Initial URL attempt:", directUrl);
+        setVideoSrc(directUrl);
+        
+        // Prepare alternative formats to try if the primary one fails
+        const urlWithoutExtension = videoUrl.replace(/\.[^/.]+$/, "");
+        const alternativeFormats = [
+          videoUrl, // Original URL
+          `training_videos/${videoUrl.split('/').pop()}`, // Just the filename with training_videos prefix
+          `uploads/${videoUrl.split('/').pop()}`, // Just the filename with uploads prefix
+        ];
+        
+        console.log("Alternative formats prepared:", alternativeFormats);
+        setAvailableFormats(alternativeFormats);
+      } catch (err) {
+        console.error("Error setting up video URL:", err);
+      }
     }
   }, [videoUrl, videoType]);
   
@@ -209,24 +229,46 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
     
     setError(errorMessage);
     setIsPlaying(false);
+    
+    // Try to load with next available format if there are more to try
+    if (availableFormats.length > 0) {
+      const nextFormat = availableFormats.shift();
+      if (nextFormat) {
+        console.log("Auto trying next format:", nextFormat);
+        setVideoSrc(getProperVideoUrl(nextFormat));
+      }
+    }
   };
   
-  // Direct URL for public videos
+  // Try direct URL for video
   const tryDirectUrl = () => {
     if (videoUrl && videoType === "UPLOAD") {
-      // Try with a different URL format
-      let newUrl = videoUrl;
-      if (videoUrl.includes('storage/v1/object/public')) {
-        // If already using public path, try using authenticated path
-        newUrl = videoUrl.replace('/storage/v1/object/public', '/storage/v1/object/authenticated');
-      } else if (!videoUrl.startsWith('http')) {
-        // Try with full URL if it's a partial path
-        newUrl = `${import.meta.env.VITE_SUPABASE_URL || ''}/storage/v1/object/public/${videoUrl}`;
+      try {
+        // Prepare a list of URLs to try
+        const urlsToTry = [
+          // Original with authenticated path
+          videoUrl.replace('/storage/v1/object/public', '/storage/v1/object/authenticated'),
+          // Try with direct Supabase URL
+          `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/public/training_videos/${videoUrl.split('/').pop()}`,
+          // Try with just the filename in training_videos bucket
+          `training_videos/${videoUrl.split('/').pop()}`,
+          // Try with direct embed
+          `https://deudqfjiieufqenzfclv.supabase.co/storage/v1/object/authenticated/training_videos/${videoUrl.split('/').pop()}?download=true`,
+        ];
+        
+        // Use the first URL that hasn't been tried yet
+        const nextUrl = urlsToTry.find(url => url !== videoSrc);
+        
+        if (nextUrl) {
+          console.log("Trying alternative URL:", nextUrl);
+          setVideoSrc(getProperVideoUrl(nextUrl));
+          setError(null);
+        } else {
+          setError("Tentamos todos os formatos disponíveis. O vídeo pode estar indisponível.");
+        }
+      } catch (err) {
+        console.error("Error with alternative URL:", err);
       }
-      
-      console.log("Trying alternative URL:", newUrl);
-      setVideoSrc(newUrl);
-      setError(null);
     }
   };
   
@@ -238,12 +280,15 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
           <AlertTitle>Erro de reprodução</AlertTitle>
           <AlertDescription className="flex flex-col">
             <p>{error}</p>
-            <button 
-              onClick={tryDirectUrl}
-              className="text-sm font-medium text-blue-600 hover:underline mt-2 self-end"
-            >
-              Tentar URL alternativo
-            </button>
+            <div className="flex justify-end mt-4">
+              <Button 
+                onClick={tryDirectUrl}
+                variant="secondary"
+                size="sm"
+              >
+                Tentar URL alternativo
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -251,7 +296,6 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
       {videoSrc && (
         <video
           ref={videoRef}
-          src={videoSrc}
           className="w-full h-auto"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
@@ -265,7 +309,10 @@ const VideoPlayer = ({ videoUrl, videoType, onProgressUpdate, initialProgress = 
             }
           }}
           crossOrigin="anonymous"
-        />
+        >
+          <source src={videoSrc} type="video/mp4" />
+          <p>Seu navegador não suporta a reprodução de vídeos.</p>
+        </video>
       )}
       
       {/* Video controls - appears on hover */}

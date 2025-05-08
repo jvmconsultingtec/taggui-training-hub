@@ -52,7 +52,7 @@ const TrainingCard = (props: TrainingCardProps) => {
     thumbnailUrl
   } = props;
 
-  // Calculate progress bar width based on status
+  // Calculate progress bar width based on status instead of actual progress percentage
   const progressWidth = status === "completed" ? 100 : 
                        status === "in_progress" ? 50 : 0;
 

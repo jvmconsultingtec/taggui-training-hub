@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -39,6 +40,31 @@ const handleError = (error: any, message: string) => {
   });
   
   throw error;
+};
+
+// Helper function to create the training_videos bucket if it doesn't exist
+export const ensureTrainingVideosBucket = async () => {
+  try {
+    // Check if bucket exists
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(bucket => bucket.name === 'training_videos');
+    
+    if (!bucketExists) {
+      // Create bucket
+      const { data, error } = await supabase.storage.createBucket('training_videos', {
+        public: true,
+        fileSizeLimit: 52428800, // 50MB
+      });
+      
+      if (error) {
+        console.error("Error creating training_videos bucket:", error);
+      } else {
+        console.log("Created training_videos bucket");
+      }
+    }
+  } catch (error) {
+    console.error("Error checking/creating bucket:", error);
+  }
 };
 
 // Users
@@ -290,18 +316,23 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
     const existingProgress = await fetchTrainingProgress(trainingId, userId);
     
     // Prepare data for update or create
-    const updates = {
+    const updates: any = {
       progress_pct: progressPct,
       last_viewed_at: new Date().toISOString(),
-      ...(completed && !existingProgress?.completed_at ? { completed_at: new Date().toISOString() } : {})
     };
     
+    // Only set completed_at if the status is being changed to completed
+    // and it wasn't already completed
+    if (completed && !existingProgress?.completed_at) {
+      updates.completed_at = new Date().toISOString();
+    }
+    
+    // If switching from completed to another status, remove the completed_at date
+    if (!completed && existingProgress?.completed_at) {
+      updates.completed_at = null;
+    }
+    
     if (existingProgress) {
-      // Don't overwrite completed_at if already completed
-      if (existingProgress.completed_at && completed) {
-        delete updates.completed_at;
-      }
-      
       // Update existing record
       const { data, error } = await supabase
         .from("training_progress")
@@ -355,6 +386,9 @@ export const fetchUserTrainingProgress = async (userId: string) => {
 export const uploadTrainingVideo = async (file: File) => {
   try {
     console.log("Starting video upload...");
+    
+    // Ensure the bucket exists
+    await ensureTrainingVideosBucket();
     
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
@@ -428,3 +462,6 @@ export const uploadTrainingVideo = async (file: File) => {
     throw error;
   }
 };
+
+// Call ensureTrainingVideosBucket on module import to make sure the bucket exists
+ensureTrainingVideosBucket();
