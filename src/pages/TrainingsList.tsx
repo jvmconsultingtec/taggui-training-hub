@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { PlusCircle, Filter, Search, MoreVertical, Edit, Trash2, Users, Loader } from "lucide-react";
+import { Filter, Search, MoreVertical, Edit, Trash2, Users, Loader } from "lucide-react";
 import Layout from "../components/layout/Layout";
 import { fetchTrainings, deleteTraining, fetchCurrentUser, fetchUserTrainingProgress } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
@@ -96,7 +96,7 @@ const ActionsMenu = ({ id, onDelete }: { id: string, onDelete: () => void }) => 
 
 const TrainingsList = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | TrainingStatus>("all");
@@ -272,10 +272,13 @@ const TrainingsList = () => {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Treinamentos</h1>
           
-          <Link to="/trainings/new" className="taggui-btn-primary flex items-center gap-2">
-            <PlusCircle size={18} />
-            <span>Novo Treinamento</span>
-          </Link>
+          {/* Mostrar botão apenas para administradores */}
+          {isAdmin && (
+            <Link to="/admin/trainings/new" className="taggui-btn-primary flex items-center gap-2">
+              <PlusCircle size={18} />
+              <span>Novo Treinamento</span>
+            </Link>
+          )}
         </div>
         
         {error && (

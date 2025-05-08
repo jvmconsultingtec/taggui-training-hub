@@ -22,6 +22,11 @@ import Reports from "./pages/Reports";
 import Company from "./pages/Company";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import UserGroups from "./pages/admin/UserGroups";
+import UserGroupForm from "./pages/admin/UserGroupForm";
+import GroupMembers from "./pages/admin/GroupMembers";
+import UserManagement from "./pages/admin/UserManagement";
+import TrainingGroupAssignment from "./pages/admin/TrainingGroupAssignment";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,6 +72,16 @@ const App = () => (
               <Route path="/admin/trainings" element={<TrainingsList />} />
               <Route path="/admin/trainings/new" element={<TrainingForm />} />
               <Route path="/admin/trainings/edit/:id" element={<TrainingForm />} />
+              <Route path="/admin/trainings/assign/:trainingId" element={<TrainingGroupAssignment />} />
+              
+              {/* Grupos de usuários */}
+              <Route path="/admin/groups" element={<UserGroups />} />
+              <Route path="/admin/groups/new" element={<UserGroupForm />} />
+              <Route path="/admin/groups/edit/:id" element={<UserGroupForm />} />
+              <Route path="/admin/groups/:groupId/members" element={<GroupMembers />} />
+              
+              {/* Gerenciamento de usuários */}
+              <Route path="/admin/users" element={<UserManagement />} />
             </Route>
             
             {/* Catch-all for 404 */}
