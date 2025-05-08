@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "@/hooks/use-toast";
@@ -349,21 +350,41 @@ export const fetchUserTrainingProgress = async (userId: string) => {
 // Storage
 export const uploadTrainingVideo = async (file: File) => {
   try {
+    console.log("Starting video upload...");
+    
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
     const filePath = `uploads/${fileName}`;
     
-    const { error } = await supabase.storage
+    console.log("Upload path:", filePath, "File size:", file.size);
+    
+    // Check available buckets
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error("Error listing buckets:", bucketsError);
+    } else {
+      console.log("Available buckets:", buckets);
+    }
+    
+    const { data, error } = await supabase.storage
       .from('training_videos')
       .upload(filePath, file);
     
-    if (error) throw error;
+    if (error) {
+      console.error("Upload error:", error);
+      throw error;
+    }
     
-    const { data } = supabase.storage
+    console.log("Upload successful:", data);
+    
+    const { data: urlData } = supabase.storage
       .from('training_videos')
       .getPublicUrl(filePath);
     
-    return data.publicUrl;
+    console.log("Public URL:", urlData.publicUrl);
+    
+    return urlData.publicUrl;
   } catch (error) {
     handleError(error, "Error uploading training video:");
     throw error;

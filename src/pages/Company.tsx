@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -55,7 +56,7 @@ const Company = () => {
         const companyId = user.company_id;
         console.log("Using company ID:", companyId);
         
-        // With company_id, fetch company data
+        // With company_id, fetch company data directly (no RLS policies now)
         try {
           const { data: companyInfo, error: companyError } = await supabase
             .from("companies")
@@ -138,21 +139,35 @@ const Company = () => {
         const { data: buckets } = await supabase.storage.listBuckets();
         console.log("Available buckets:", buckets);
         
-        // Use the bucket training_videos for now
-        const { error: uploadError } = await supabase.storage
-          .from('training_videos')
-          .upload(filePath, logoFile);
+        try {
+          // Use the bucket training_videos for now
+          const { error: uploadError, data: uploadData } = await supabase.storage
+            .from('training_videos')
+            .upload(filePath, logoFile);
+            
+          if (uploadError) {
+            console.error("Error uploading logo:", uploadError);
+            throw uploadError;
+          }
           
-        if (uploadError) {
-          console.error("Error uploading logo:", uploadError);
-          throw uploadError;
+          console.log("Upload successful:", uploadData);
+          
+          const { data } = supabase.storage
+            .from('training_videos')
+            .getPublicUrl(filePath);
+            
+          logoUrl = data.publicUrl;
+          console.log("New logo URL:", logoUrl);
+        } catch (uploadErr: any) {
+          console.error("Upload error details:", uploadErr);
+          toast({
+            title: "Erro no upload",
+            description: uploadErr.message || "Não foi possível fazer o upload do logo",
+            variant: "destructive"
+          });
+          setSubmitting(false);
+          return;
         }
-        
-        const { data } = supabase.storage
-          .from('training_videos')
-          .getPublicUrl(filePath);
-          
-        logoUrl = data.publicUrl;
       }
       
       // Update company data
@@ -165,6 +180,7 @@ const Company = () => {
         .eq("id", companyData.id);
         
       if (updateError) {
+        console.error("Error updating company:", updateError);
         throw updateError;
       }
       
