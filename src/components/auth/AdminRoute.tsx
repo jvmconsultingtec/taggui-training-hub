@@ -4,60 +4,22 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 export const AdminRoute = () => {
-  const { user, session, loading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [checkingAdmin, setCheckingAdmin] = useState<boolean>(true);
+  const { user, session, isAdmin, loading } = useAuth();
+  const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
   
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user || !session) {
-        setIsAdmin(false);
-        setCheckingAdmin(false);
-        return;
-      }
-      
-      try {
-        console.log("Verificando status de administrador para:", user.id);
-        
-        // Chamar diretamente a Edge Function
-        const response = await fetch(`https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${user.id}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'x-user-id': user.id
-          }
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Erro na resposta: ${response.status} - ${errorData.error || 'Erro desconhecido'}`);
-        }
-        
-        const result = await response.json();
-        console.log("Resultado da verificação de admin:", result);
-        setIsAdmin(!!result.isAdmin);
-      } catch (err) {
-        console.error("Erro ao verificar status de admin:", err);
-        toast({
-          title: "Erro",
-          description: "Não foi possível verificar suas permissões de administrador",
-          variant: "destructive"
-        });
-        setIsAdmin(false);
-      } finally {
-        setCheckingAdmin(false);
-      }
-    };
+    // Use a small timeout to ensure auth state is updated
+    const timer = setTimeout(() => {
+      setCheckingAuth(false);
+    }, 500);
     
-    checkAdminStatus();
-  }, [user, session]);
+    return () => clearTimeout(timer);
+  }, [user, isAdmin]);
   
   // Mostrar carregamento enquanto verifica
-  if (loading || checkingAdmin) {
+  if (loading || checkingAuth) {
     return (
       <div className="flex flex-col gap-4 p-8">
         <div className="mb-4 text-center">

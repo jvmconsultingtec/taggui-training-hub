@@ -23,38 +23,34 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-
-  // Função para verificar se o usuário é admin usando a Edge Function
-  const checkAdminStatus = async (currentUser: User, currentSession: Session) => {
-    if (!currentUser || !currentSession) {
+  
+  // Função para verificar se o usuário é admin usando função RPC direta
+  // que não depende da edge function problemática
+  const checkAdminStatus = async (currentUser: User | null) => {
+    if (!currentUser) {
       setIsAdmin(false);
       return;
     }
     
     try {
-      console.log("Verificando status de admin via Edge Function para:", currentUser.id);
+      console.log("Verificando status de admin via RPC para:", currentUser.id);
       
-      const response = await fetch(
-        `https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${currentUser.id}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${currentSession.access_token}`,
-            'Content-Type': 'application/json',
-            'x-user-id': currentUser.id
-          }
-        }
-      );
+      // Usar RPC para chamar is_admin no banco de dados diretamente
+      const { data, error } = await supabase.rpc('is_admin', {
+        user_id: currentUser.id
+      });
       
-      if (!response.ok) {
-        throw new Error(`Erro na resposta: ${response.status}`);
+      if (error) {
+        console.error("Erro ao verificar status de admin via RPC:", error);
+        setIsAdmin(false);
+        return;
       }
       
-      const result = await response.json();
-      console.log("Resultado da verificação de admin:", result);
-      setIsAdmin(!!result.isAdmin);
+      console.log("Resultado da verificação de admin via RPC:", data);
+      setIsAdmin(!!data);
+      
     } catch (err) {
-      console.error("Erro ao verificar status de admin:", err);
+      console.error("Exceção ao verificar status de admin:", err);
       setIsAdmin(false);
     }
   };
@@ -71,14 +67,13 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
           
-          // Verificar status de admin após delay para evitar loops
+          // Verificar status de admin com pequeno delay para evitar problemas
           if (currentSession?.user) {
-            // Usar setTimeout para garantir que a UI não trava
             setTimeout(() => {
               if (mounted) {
-                checkAdminStatus(currentSession.user, currentSession);
+                checkAdminStatus(currentSession.user);
               }
-            }, 0);
+            }, 100);
           } else {
             setIsAdmin(false);
           }
@@ -106,7 +101,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           setUser(data.session.user);
           
           // Verificar status de admin
-          await checkAdminStatus(data.session.user, data.session);
+          await checkAdminStatus(data.session.user);
         }
         
         if (mounted) {
@@ -128,6 +123,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     };
   }, []);
   
+  // Restante das funções de autenticação
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {

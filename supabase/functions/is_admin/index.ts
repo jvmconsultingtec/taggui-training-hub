@@ -22,7 +22,7 @@ serve(async (req) => {
     const userId = new URL(req.url).searchParams.get('user_id');
     
     if (!userId) {
-      return new Response(JSON.stringify({ error: 'No user ID provided' }), {
+      return new Response(JSON.stringify({ error: 'No user ID provided', isAdmin: false }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -30,8 +30,8 @@ serve(async (req) => {
 
     console.log("Verificando status de admin para o usuário:", userId);
 
-    // Usando SERVICE_ROLE_KEY para contornar RLS completamente
-    const supabaseAdmin = createClient(
+    // Use executar SQL direto em vez de query builder para evitar problemas de permissão
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
@@ -39,16 +39,15 @@ serve(async (req) => {
         auth: { persistSession: false }
       }
     );
-
-    // Execute consulta direta para verificar se o usuário é admin
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
+    
+    // Execute função SQL RPC is_user_admin que já existe e é SECURITY DEFINER
+    const { data, error } = await supabaseClient.rpc(
+      'is_user_admin', 
+      { user_id: userId }
+    );
 
     if (error) {
-      console.error("Erro na consulta de admin:", error);
+      console.error("Erro ao chamar função is_user_admin:", error);
       return new Response(JSON.stringify({ 
         error: error.message,
         isAdmin: false 
@@ -58,16 +57,13 @@ serve(async (req) => {
       });
     }
     
-    // Verificar o papel do usuário
-    const isAdmin = data?.role === 'ADMIN';
-    console.log("Resultado da verificação de admin:", { userId, role: data?.role, isAdmin });
+    const isAdmin = !!data;
+    console.log("Resultado da verificação de admin via is_user_admin:", { userId, isAdmin });
     
-    // Retornar o resultado
     return new Response(JSON.stringify({ isAdmin }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    
   } catch (error) {
     console.error('Erro ao verificar status de admin:', error);
     
