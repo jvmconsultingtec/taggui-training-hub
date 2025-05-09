@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,21 +7,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [isRedirecting, setIsRedirecting] = useState(false);
-
+  
   useEffect(() => {
-    if (!loading && !isRedirecting) {
-      setIsRedirecting(true);
-      
-      if (user) {
-        console.log("Usuário autenticado, redirecionando para dashboard");
-        navigate("/dashboard");
-      } else {
-        console.log("Nenhum usuário, redirecionando para login");
-        navigate("/login");
+    const checkAuthAndRedirect = () => {
+      if (!loading) {
+        if (user) {
+          console.log("Usuário autenticado, redirecionando para dashboard");
+          navigate("/dashboard");
+        } else {
+          console.log("Nenhum usuário, redirecionando para login");
+          navigate("/login");
+        }
       }
-    }
-  }, [user, loading, navigate, isRedirecting]);
+    };
+    
+    checkAuthAndRedirect();
+  }, [user, loading, navigate]);
 
   // Mostrar carregamento enquanto verifica autenticação
   if (loading) {

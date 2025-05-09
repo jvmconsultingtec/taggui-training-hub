@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader } from "lucide-react";
-import { supabase, executeRPC } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
@@ -25,29 +25,35 @@ const UserGroupForm = () => {
   const isEditMode = !!id;
   
   useEffect(() => {
-    // Obter o ID da empresa do usuário usando a função RPC segura
+    // Obter o ID da empresa do usuário 
     const fetchUserCompanyId = async () => {
       try {
         setLoading(true);
-        console.log("Fetching company ID using RPC function");
+        console.log("Buscando ID da empresa");
         
-        // Usamos a função RPC get_auth_user_company_id que é SECURITY DEFINER
-        // e evita problemas de recursão
-        const companyId = await executeRPC<string>('get_auth_user_company_id');
+        // Usar diretamente a função RPC para evitar recursão
+        const { data: companyData, error: companyError } = await supabase.rpc(
+          'get_auth_user_company_id'
+        );
         
-        console.log("Company ID retrieved:", companyId);
-        if (companyId) {
-          setCompanyId(companyId);
+        if (companyError) {
+          console.error("Erro ao buscar ID da empresa:", companyError);
+          throw companyError;
+        }
+        
+        console.log("ID da empresa obtido:", companyData);
+        if (companyData) {
+          setCompanyId(companyData);
           
           // Se estamos em modo de edição, carregar também os dados do grupo
           if (isEditMode) {
             await loadGroupData();
           }
         } else {
-          throw new Error("Company ID not found");
+          throw new Error("ID da empresa não encontrado");
         }
       } catch (error) {
-        console.error("Error fetching company ID:", error);
+        console.error("Erro ao buscar ID da empresa:", error);
         toast({
           title: "Erro",
           description: "Não foi possível obter informações da empresa",
@@ -63,10 +69,9 @@ const UserGroupForm = () => {
 
   const loadGroupData = async () => {
     try {
-      console.log("Loading group data for ID:", id);
+      console.log("Carregando dados do grupo para ID:", id);
       
-      // Usando query direta ao invés de RPC porque não estamos
-      // em um contexto onde recursão seria um problema
+      // Consulta direta à tabela de grupos
       const { data, error } = await supabase
         .from("user_groups")
         .select("*")
@@ -74,11 +79,11 @@ const UserGroupForm = () => {
         .single();
         
       if (error) {
-        console.error("Error loading group data:", error);
+        console.error("Erro ao carregar dados do grupo:", error);
         throw error;
       }
       
-      console.log("Group data loaded:", data);
+      console.log("Dados do grupo carregados:", data);
       setName(data.name);
       setDescription(data.description || "");
     } catch (error) {
@@ -115,7 +120,7 @@ const UserGroupForm = () => {
     
     try {
       setSaving(true);
-      console.log("Saving group with company ID:", companyId);
+      console.log("Salvando grupo com company ID:", companyId);
       
       if (isEditMode) {
         // Atualizar grupo existente
@@ -128,7 +133,7 @@ const UserGroupForm = () => {
           .eq("id", id);
           
         if (error) {
-          console.error("Error updating group:", error);
+          console.error("Erro ao atualizar grupo:", error);
           throw error;
         }
         
@@ -149,11 +154,11 @@ const UserGroupForm = () => {
           .select();
           
         if (error) {
-          console.error("Error creating group:", error);
+          console.error("Erro ao criar grupo:", error);
           throw error;
         }
         
-        console.log("Group created successfully:", data);
+        console.log("Grupo criado com sucesso:", data);
         
         toast({
           title: "Grupo criado",

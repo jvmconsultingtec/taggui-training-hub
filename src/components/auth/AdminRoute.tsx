@@ -2,12 +2,52 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const AdminRoute = () => {
-  const { user, session, loading, isAdmin } = useAuth();
+  const { user, session, loading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [checkingRole, setCheckingRole] = useState(true);
   
-  // Mostrar carregamento enquanto verifica autenticação
-  if (loading) {
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        setCheckingRole(false);
+        return;
+      }
+      
+      try {
+        console.log("Verificando status de administrador para:", user.id);
+        
+        // Verificar usando RPC para evitar recursão
+        const { data, error } = await supabase.rpc('is_admin', { user_id: user.id });
+        
+        if (error) {
+          console.error("Erro ao verificar status de admin:", error);
+          setIsAdmin(false);
+        } else {
+          console.log("Status de admin:", data);
+          setIsAdmin(!!data);
+        }
+      } catch (err) {
+        console.error("Erro ao verificar status de admin:", err);
+        setIsAdmin(false);
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+    
+    if (user) {
+      checkAdminStatus();
+    } else {
+      setCheckingRole(false);
+    }
+  }, [user]);
+  
+  // Mostrar carregamento enquanto verifica autenticação e papel
+  if (loading || checkingRole) {
     return (
       <div className="flex flex-col gap-4 p-8">
         <div className="mb-4 text-center">
