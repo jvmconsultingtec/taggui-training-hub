@@ -93,6 +93,8 @@ export const getCurrentUserCompanyId = async (): Promise<string> => {
     const session = await supabase.auth.getSession();
     const userId = session.data.session?.user?.id;
     
+    console.log("Getting company ID for user:", userId);
+    
     const { data, error } = await supabase.functions.invoke('get_auth_user_company_id', {
       headers: {
         'x-user-id': userId || ''
@@ -104,6 +106,7 @@ export const getCurrentUserCompanyId = async (): Promise<string> => {
       throw error;
     }
     
+    console.log("Company ID result:", data);
     return data;
   } catch (error) {
     console.error("Error getting company ID:", error);

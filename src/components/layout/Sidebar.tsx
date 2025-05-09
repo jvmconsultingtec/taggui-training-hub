@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   BarChart, 
   VideoIcon, 
@@ -46,8 +46,11 @@ const Sidebar = () => {
   const { user, isAdmin } = useAuth();
   
   const isActive = (path: string) => location.pathname.startsWith(path);
-
-  console.log("Sidebar rendering - isAdmin:", isAdmin);
+  
+  useEffect(() => {
+    console.log("Sidebar rendering - user:", user?.email);
+    console.log("Sidebar rendering - isAdmin:", isAdmin);
+  }, [user, isAdmin]);
   
   return (
     <div 

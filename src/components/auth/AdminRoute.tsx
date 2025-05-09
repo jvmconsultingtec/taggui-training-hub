@@ -3,15 +3,23 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
 
 export const AdminRoute = () => {
   const { user, session, loading, isAdmin } = useAuth();
+  const [checked, setChecked] = useState(false);
   
-  console.log("AdminRoute - User:", user?.email);
-  console.log("AdminRoute - Is user admin?", isAdmin);
-
+  useEffect(() => {
+    console.log("AdminRoute - User:", user?.email);
+    console.log("AdminRoute - Is user admin?", isAdmin);
+    
+    if (!loading) {
+      setChecked(true);
+    }
+  }, [user, isAdmin, loading]);
+  
   // Mostrar carregamento enquanto verifica autenticação ou permissões
-  if (loading) {
+  if (loading || !checked) {
     return (
       <div className="flex flex-col gap-4 p-8">
         <Skeleton className="h-8 w-full" />
@@ -41,5 +49,6 @@ export const AdminRoute = () => {
   }
 
   // Exibir conteúdo somente se o usuário for administrador
+  console.log("AdminRoute - User is admin, showing admin content");
   return <Outlet />;
 };

@@ -24,6 +24,17 @@ serve(async (req) => {
       });
     }
 
+    // Get the user ID from headers
+    const userId = req.headers.get('x-user-id');
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'No user ID provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log("Checking admin status for user:", userId);
+
     // Create a Supabase client with the user's JWT
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -41,13 +52,19 @@ serve(async (req) => {
     const { data, error } = await supabase
       .from('users')
       .select('role')
-      .eq('id', req.headers.get('x-user-id') || '')
+      .eq('id', userId)
       .maybeSingle();
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error querying user role:", error);
+      throw error;
+    }
+    
+    console.log("User role data:", data);
     
     // Check if the user is admin based on role
     const isAdmin = data?.role === 'ADMIN';
+    console.log("Is user admin?", isAdmin);
 
     // Return the result
     return new Response(JSON.stringify(isAdmin), {
