@@ -16,6 +16,7 @@ import {
 import { PlusCircle, Search, Edit, Trash2, Users, Loader } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface UserGroup {
   id: string;
@@ -29,6 +30,7 @@ interface UserGroup {
 
 const UserGroups = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [groups, setGroups] = useState<UserGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,10 +40,49 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Buscar grupos diretamente sem depender de RLS
+      if (!user || !user.id) {
+        toast({
+          title: "Erro de autenticação",
+          description: "Você precisa estar logado para acessar esta página",
+          variant: "destructive",
+        });
+        navigate("/login");
+        return;
+      }
+      
+      // Primeiro buscar o company_id do usuário
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("company_id")
+        .eq("id", user.id)
+        .single();
+        
+      if (userError) {
+        console.error("Erro ao buscar company_id do usuário:", userError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível obter informações da empresa",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
+      if (!userData?.company_id) {
+        toast({
+          title: "Erro",
+          description: "ID da empresa não encontrado",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Usar consulta SQL direta (mais confiável sem RLS)
       const { data: userGroups, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
+        .eq("company_id", userData.company_id)
         .order("name");
 
       if (groupsError) {
@@ -100,7 +141,7 @@ const UserGroups = () => {
 
   useEffect(() => {
     fetchGroups();
-  }, []);
+  }, [user]);
 
   // Filtrar grupos com base na pesquisa
   useEffect(() => {
