@@ -20,18 +20,15 @@ const UserGroupForm = () => {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [companyId, setCompanyId] = useState<string | null>(null);
   
   const isEditMode = !!id;
   
   useEffect(() => {
-    // Obter o ID da empresa do usuário de forma direta e simplificada
-    const fetchUserCompanyId = async () => {
+    const initialize = async () => {
       try {
         setLoading(true);
-        console.log("Buscando ID da empresa");
         
-        if (!user || !user.id) {
+        if (!user) {
           toast({
             title: "Erro de autenticação",
             description: "Você precisa estar logado para acessar esta página",
@@ -41,44 +38,15 @@ const UserGroupForm = () => {
           return;
         }
         
-        // Busca direta e simples do ID da empresa
-        const { data, error } = await supabase
-          .from("users")
-          .select("company_id")
-          .eq("id", user.id)
-          .single();
-          
-        if (error) {
-          console.error("Erro ao buscar ID da empresa:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível obter informações da empresa",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        if (!data?.company_id) {
-          toast({
-            title: "Erro",
-            description: "ID da empresa não encontrado",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        console.log("ID da empresa obtido:", data.company_id);
-        setCompanyId(data.company_id);
-        
-        // Se estamos em modo de edição, carregar também os dados do grupo
+        // Se estamos em modo de edição, carregar os dados do grupo
         if (isEditMode && id) {
           await loadGroupData(id);
         }
       } catch (error) {
-        console.error("Exceção ao buscar ID da empresa:", error);
+        console.error("Erro ao inicializar:", error);
         toast({
           title: "Erro",
-          description: "Erro inesperado ao obter informações da empresa",
+          description: "Erro inesperado ao inicializar o formulário",
           variant: "destructive",
         });
       } finally {
@@ -86,14 +54,14 @@ const UserGroupForm = () => {
       }
     };
     
-    fetchUserCompanyId();
+    initialize();
   }, [id, isEditMode, user, navigate]);
 
   const loadGroupData = async (groupId: string) => {
     try {
       console.log("Carregando dados do grupo para ID:", groupId);
       
-      // Consulta direta à tabela de grupos sem depender de RLS
+      // Consulta simples à tabela de grupos
       const { data, error } = await supabase
         .from("user_groups")
         .select("*")
@@ -137,18 +105,8 @@ const UserGroupForm = () => {
       return;
     }
     
-    if (!companyId) {
-      toast({
-        title: "Erro",
-        description: "Informações da empresa não disponíveis",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
       setSaving(true);
-      console.log("Salvando grupo com company ID:", companyId);
       
       if (isEditMode && id) {
         // Atualizar grupo existente
@@ -170,14 +128,14 @@ const UserGroupForm = () => {
           description: "O grupo foi atualizado com sucesso",
         });
       } else {
-        // Criar novo grupo com o company_id explícito
+        // Criar novo grupo - não precisamos mais enviar o company_id explicitamente
+        // pois a RLS vai garantir que o usuário só pode inserir em sua empresa
         const { data, error } = await supabase
           .from("user_groups")
           .insert({
             name,
             description: description.trim() || null,
-            created_by: user?.id,
-            company_id: companyId
+            created_by: user?.id
           })
           .select();
           

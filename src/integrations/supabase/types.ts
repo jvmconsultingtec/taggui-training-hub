@@ -413,6 +413,13 @@ export type Database = {
         Args: { user_id: string; company_id: string }
         Returns: boolean
       }
+      user_company_access: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          company_id: string
+        }[]
+      }
       user_has_training_access: {
         Args: { p_user_id: string; p_training_id: string }
         Returns: boolean

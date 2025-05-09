@@ -40,7 +40,7 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      if (!user || !user.id) {
+      if (!user) {
         toast({
           title: "Erro de autenticação",
           description: "Você precisa estar logado para acessar esta página",
@@ -50,39 +50,10 @@ const UserGroups = () => {
         return;
       }
       
-      // Primeiro buscar o company_id do usuário
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("company_id")
-        .eq("id", user.id)
-        .single();
-        
-      if (userError) {
-        console.error("Erro ao buscar company_id do usuário:", userError);
-        toast({
-          title: "Erro",
-          description: "Não foi possível obter informações da empresa",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-      
-      if (!userData?.company_id) {
-        toast({
-          title: "Erro",
-          description: "ID da empresa não encontrado",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-      
-      // Usar consulta SQL direta (mais confiável sem RLS)
+      // Now we can use RLS directly since we fixed the policies
       const { data: userGroups, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
-        .eq("company_id", userData.company_id)
         .order("name");
 
       if (groupsError) {
