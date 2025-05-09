@@ -56,39 +56,23 @@ serve(async (req) => {
       }
     );
 
-    // Query user role directly using RPC function
-    const { data, error } = await supabase.rpc('is_user_admin', { 
-      user_id: userId 
-    });
+    // Query user role directly from the users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
     
-    if (error) {
-      console.error("Error checking admin status via RPC:", error);
-      
-      // Fallback to direct query if RPC fails
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .single();
-      
-      if (userError) {
-        console.error("Error in fallback admin check:", userError);
-        throw userError;
-      }
-      
-      const isAdmin = userData?.role === 'ADMIN';
-      console.log(`Admin status from fallback: ${isAdmin}`);
-      
-      return new Response(JSON.stringify(isAdmin), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (userError) {
+      console.error("Error checking admin status:", userError);
+      throw userError;
     }
     
-    console.log(`Admin status from RPC: ${data}`);
+    const isAdmin = userData?.role === 'ADMIN';
+    console.log(`Admin status from direct query: ${isAdmin}`);
     
     // Return the result
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(isAdmin), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

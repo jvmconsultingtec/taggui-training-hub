@@ -25,32 +25,34 @@ const UserGroupForm = () => {
   const isEditMode = !!id;
   
   useEffect(() => {
-    // Obter o ID da empresa do usuário 
+    // Obter o ID da empresa do usuário de forma segura
     const fetchUserCompanyId = async () => {
       try {
         setLoading(true);
         console.log("Buscando ID da empresa");
         
-        // Usar diretamente a função RPC para evitar recursão
-        const { data: companyData, error: companyError } = await supabase.rpc(
-          'get_auth_user_company_id'
-        );
-        
-        if (companyError) {
-          console.error("Erro ao buscar ID da empresa:", companyError);
-          throw companyError;
+        // Buscar o perfil do usuário diretamente (agora com as novas políticas)
+        const { data: userProfile, error: userError } = await supabase
+          .from("users")
+          .select("company_id")
+          .eq("id", user?.id)
+          .single();
+          
+        if (userError) {
+          console.error("Erro ao buscar perfil do usuário:", userError);
+          throw userError;
         }
         
-        console.log("ID da empresa obtido:", companyData);
-        if (companyData) {
-          setCompanyId(companyData);
-          
-          // Se estamos em modo de edição, carregar também os dados do grupo
-          if (isEditMode) {
-            await loadGroupData();
-          }
-        } else {
+        if (!userProfile?.company_id) {
           throw new Error("ID da empresa não encontrado");
+        }
+        
+        console.log("ID da empresa obtido:", userProfile.company_id);
+        setCompanyId(userProfile.company_id);
+        
+        // Se estamos em modo de edição, carregar também os dados do grupo
+        if (isEditMode) {
+          await loadGroupData();
         }
       } catch (error) {
         console.error("Erro ao buscar ID da empresa:", error);
@@ -64,8 +66,10 @@ const UserGroupForm = () => {
       }
     };
     
-    fetchUserCompanyId();
-  }, [id, isEditMode]);
+    if (user) {
+      fetchUserCompanyId();
+    }
+  }, [id, isEditMode, user]);
 
   const loadGroupData = async () => {
     try {
