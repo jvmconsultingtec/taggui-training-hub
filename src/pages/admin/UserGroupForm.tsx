@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -42,7 +41,7 @@ const UserGroupForm = () => {
         
         // Fetch the user's company_id
         try {
-          const companyIdResult = await executeRPC("get_auth_user_company_id");
+          const companyIdResult = await executeRPC<string>("get_auth_user_company_id");
           setCompanyId(companyIdResult);
           console.log("Obtained company ID:", companyIdResult);
         } catch (error) {

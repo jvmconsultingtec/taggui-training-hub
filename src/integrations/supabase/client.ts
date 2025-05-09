@@ -96,8 +96,8 @@ export const executeRPC = async <T>(functionName: AllowedRpcFunctions, params?: 
       throw error;
     }
     
-    // Ensure we return an array, even if data is null
-    return (data || []) as T;
+    // Ensure we return the data with the correct type
+    return data as T;
   } catch (error) {
     console.error(`Exception in RPC ${functionName}:`, error);
     throw error;
