@@ -68,17 +68,9 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
   try {
     console.log(`Executing RPC function: ${functionName}`, params);
     
-    // Clear any cached results first
-    await supabase.rpc(functionName as any, params || {}, { cache: 'no-store' });
-    
-    // Use type assertion (as any) to bypass the TypeScript constraint
-    // This allows us to use any function name at runtime
-    const { data, error } = await supabase.rpc(functionName as any, params || {}, {
-      headers: { 
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
+    // Use the functions API to invoke the Postgres function
+    const { data, error } = await supabase.functions.invoke(functionName, {
+      body: params || {}
     });
     
     if (error) {
@@ -97,8 +89,14 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
 // Get current user's company ID using the safe RPC function
 export const getCurrentUserCompanyId = async (): Promise<string> => {
   try {
-    const companyId = await executeRPC<string>('get_auth_user_company_id');
-    return companyId;
+    const { data, error } = await supabase.functions.invoke('get_auth_user_company_id');
+    
+    if (error) {
+      console.error("Error getting company ID:", error);
+      throw error;
+    }
+    
+    return data as string;
   } catch (error) {
     console.error("Error getting company ID:", error);
     throw error;
