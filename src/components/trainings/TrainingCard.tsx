@@ -12,12 +12,14 @@ export interface TrainingCardProps {
   progress?: number;
   status?: TrainingStatus;
   thumbnailUrl?: string;
+  video_url?: string;
+  video_type?: "YOUTUBE" | "UPLOAD";
   training?: {
     id: string;
     title: string;
     description: string | null;
     duration_min: number;
-    video_type: "UPLOAD" | "YOUTUBE";
+    video_type: "YOUTUBE" | "UPLOAD";
     video_url: string;
     tags?: string[] | null;
   };
@@ -48,6 +50,8 @@ const TrainingCard = (props: TrainingCardProps) => {
     title = props.training?.title,
     description = props.training?.description,
     duration = props.training?.duration_min,
+    video_url = props.video_url || props.training?.video_url,
+    video_type = props.video_type || props.training?.video_type,
     progress = 0,
     status = "not_started",
     thumbnailUrl

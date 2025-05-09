@@ -19,7 +19,7 @@ const TrainingForm = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
-  const [videoType, setVideoType] = useState<"YOUTUBE" | "UPLOADED">("YOUTUBE");
+  const [videoType, setVideoType] = useState<"YOUTUBE" | "UPLOAD">("YOUTUBE");
   const [durationMin, setDurationMin] = useState<number>(0);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
@@ -233,14 +233,14 @@ const TrainingForm = () => {
                   <Label htmlFor="videoType">Tipo de Vídeo *</Label>
                   <Select 
                     value={videoType} 
-                    onValueChange={(value) => setVideoType(value as "YOUTUBE" | "UPLOADED")}
+                    onValueChange={(value) => setVideoType(value as "YOUTUBE" | "UPLOAD")}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo de vídeo" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="YOUTUBE">YouTube</SelectItem>
-                      <SelectItem value="UPLOADED">Upload Direto</SelectItem>
+                      <SelectItem value="UPLOAD">Upload Direto</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

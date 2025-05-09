@@ -16,7 +16,7 @@ interface Training {
   title: string;
   description: string | null;
   video_url: string;
-  video_type: 'YOUTUBE' | 'UPLOADED';
+  video_type: 'YOUTUBE' | 'UPLOAD';
   duration_min: number;
   company_id: string;
   created_at: string;
@@ -128,9 +128,9 @@ const TrainingsList = () => {
                   id={training.id}
                   title={training.title}
                   description={training.description}
-                  videoUrl={training.video_url}
+                  video_url={training.video_url}
                   duration={training.duration_min}
-                  videoType={training.video_type}
+                  video_type={training.video_type}
                 />
                 
                 {isAdmin && (
