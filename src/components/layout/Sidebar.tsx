@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   BarChart, 
   VideoIcon, 
@@ -13,6 +13,7 @@ import {
   X,
   ShieldCheck
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import TagguiLogo from "./TagguiLogo";
 import { useAuth } from "@/hooks/useAuth";
 

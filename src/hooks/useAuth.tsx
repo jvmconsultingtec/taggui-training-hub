@@ -25,25 +25,27 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Função para verificar se o usuário é admin
-  const checkAdminStatus = async (userId: string) => {
-    try {
-      // Tentar verificar pelo metadata primeiro (forma mais rápida)
-      const userRole = user?.app_metadata?.role || user?.user_metadata?.role;
-      
-      if (userRole === 'ADMIN') {
-        setIsAdmin(true);
-        return;
-      }
-      
-      // Tentativa de verificar através do banco de dados diretamente
-      const { data, error } = await supabase.rpc('is_user_admin', { user_id: userId });
-      
-      if (!error && data) {
-        setIsAdmin(true);
-        return;
-      }
-      
+  const checkAdminStatus = async (currentUser: User) => {
+    if (!currentUser) {
       setIsAdmin(false);
+      return;
+    }
+    
+    try {
+      // Abordagem simplificada - verificar diretamente o papel do usuário
+      const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+        
+      if (error) {
+        console.error("Erro ao verificar status de admin:", error);
+        setIsAdmin(false);
+        return;
+      }
+      
+      setIsAdmin(data?.role === 'ADMIN');
     } catch (err) {
       console.error("Erro ao verificar status de admin:", err);
       setIsAdmin(false);
@@ -55,15 +57,20 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     
     // Configurar o listener de mudança de estado de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        console.info(`Mudança no estado de autenticação: ${event}`, currentSession?.user?.email);
+      (event, currentSession) => {
+        console.info(`Mudança no estado de autenticação: ${event}`);
         
         if (mounted) {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
           
+          // Verificar status de admin após delay para evitar loops
           if (currentSession?.user) {
-            await checkAdminStatus(currentSession.user.id);
+            setTimeout(() => {
+              if (mounted) {
+                checkAdminStatus(currentSession.user);
+              }
+            }, 0);
           } else {
             setIsAdmin(false);
           }
@@ -90,7 +97,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           setSession(data.session);
           setUser(data.session.user);
           
-          await checkAdminStatus(data.session.user.id);
+          // Verificar status de admin
+          await checkAdminStatus(data.session.user);
         }
         
         if (mounted) {

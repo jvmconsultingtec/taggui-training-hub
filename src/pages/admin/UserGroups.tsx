@@ -16,7 +16,6 @@ import {
 import { PlusCircle, Search, Edit, Trash2, Users, Loader } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 
 interface UserGroup {
   id: string;
@@ -30,7 +29,6 @@ interface UserGroup {
 
 const UserGroups = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [groups, setGroups] = useState<UserGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,43 +38,58 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Usando policies atualizadas que não causam recursão
-      const { data: groupsData, error: groupsError } = await supabase
+      // Buscar diretamente da tabela user_groups
+      const { data: userGroups, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
         .order("name");
 
       if (groupsError) {
-        console.error("Error fetching groups:", groupsError);
-        throw groupsError;
+        console.error("Erro ao buscar grupos:", groupsError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os grupos de usuários",
+          variant: "destructive",
+        });
+        setGroups([]);
+        setFilteredGroups([]);
+        setLoading(false);
+        return;
       }
 
       // Para cada grupo, buscar o número de membros
-      const groupsWithMembersCount = await Promise.all(
-        groupsData.map(async (group) => {
-          const { count, error: countError } = await supabase
-            .from("user_group_members")
-            .select("*", { count: "exact", head: true })
-            .eq("group_id", group.id);
+      const enhancedGroups = await Promise.all(
+        userGroups.map(async (group) => {
+          try {
+            const { count, error: countError } = await supabase
+              .from("user_group_members")
+              .select("*", { count: "exact", head: true })
+              .eq("group_id", group.id);
 
-          if (countError) {
-            console.error("Erro ao buscar membros:", countError);
+            if (countError) {
+              console.error(`Erro ao contar membros para grupo ${group.id}:`, countError);
+              return { ...group, members_count: 0 };
+            }
+
+            return { ...group, members_count: count || 0 };
+          } catch (err) {
+            console.error(`Erro ao processar grupo ${group.id}:`, err);
             return { ...group, members_count: 0 };
           }
-
-          return { ...group, members_count: count || 0 };
         })
       );
 
-      setGroups(groupsWithMembersCount);
-      setFilteredGroups(groupsWithMembersCount);
+      setGroups(enhancedGroups);
+      setFilteredGroups(enhancedGroups);
     } catch (error) {
       console.error("Erro ao buscar grupos:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os grupos",
+        description: "Não foi possível carregar os grupos de usuários",
         variant: "destructive",
       });
+      setGroups([]);
+      setFilteredGroups([]);
     } finally {
       setLoading(false);
     }
@@ -90,19 +103,19 @@ const UserGroups = () => {
   useEffect(() => {
     if (!searchQuery) {
       setFilteredGroups(groups);
-    } else {
-      const filtered = groups.filter((group) =>
-        group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-      setFilteredGroups(filtered);
+      return;
     }
+    
+    const filtered = groups.filter((group) =>
+      group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    setFilteredGroups(filtered);
   }, [searchQuery, groups]);
 
   // Formatar data
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pt-BR");
+    return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
   // Deletar grupo
@@ -118,7 +131,15 @@ const UserGroups = () => {
         .delete()
         .eq("group_id", id);
 
-      if (membersError) throw membersError;
+      if (membersError) {
+        console.error("Erro ao remover membros:", membersError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível remover os membros do grupo",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Remover atribuições de treinamentos ao grupo
       const { error: assignmentsError } = await supabase
@@ -126,7 +147,15 @@ const UserGroups = () => {
         .delete()
         .eq("group_id", id);
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        console.error("Erro ao remover atribuições de treinamentos:", assignmentsError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível remover atribuições de treinamentos do grupo",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Excluir o grupo
       const { error: groupError } = await supabase
@@ -134,7 +163,15 @@ const UserGroups = () => {
         .delete()
         .eq("id", id);
 
-      if (groupError) throw groupError;
+      if (groupError) {
+        console.error("Erro ao excluir grupo:", groupError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir o grupo",
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Grupo excluído",
