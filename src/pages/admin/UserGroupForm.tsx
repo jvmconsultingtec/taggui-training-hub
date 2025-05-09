@@ -11,6 +11,7 @@ import { Loader } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { executeRPC } from "@/integrations/supabase/client";
 
 const UserGroupForm = () => {
   const { id } = useParams();
@@ -20,6 +21,7 @@ const UserGroupForm = () => {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [companyId, setCompanyId] = useState<string | null>(null);
   
   const isEditMode = !!id;
   
@@ -35,6 +37,22 @@ const UserGroupForm = () => {
             variant: "destructive",
           });
           navigate("/login");
+          return;
+        }
+        
+        // Fetch the user's company_id
+        try {
+          const companyIdResult = await executeRPC("get_auth_user_company_id");
+          setCompanyId(companyIdResult);
+          console.log("Obtained company ID:", companyIdResult);
+        } catch (error) {
+          console.error("Error fetching company ID:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível obter informações da empresa",
+            variant: "destructive",
+          });
+          navigate("/admin/groups");
           return;
         }
         
@@ -105,6 +123,15 @@ const UserGroupForm = () => {
       return;
     }
     
+    if (!companyId) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível identificar sua empresa",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setSaving(true);
       
@@ -128,13 +155,13 @@ const UserGroupForm = () => {
           description: "O grupo foi atualizado com sucesso",
         });
       } else {
-        // Criar novo grupo - não precisamos mais enviar o company_id explicitamente
-        // pois a RLS vai garantir que o usuário só pode inserir em sua empresa
+        // Criar novo grupo com company_id
         const { data, error } = await supabase
           .from("user_groups")
           .insert({
             name,
             description: description.trim() || null,
+            company_id: companyId, // Adicionar company_id aqui
             created_by: user?.id
           })
           .select();
