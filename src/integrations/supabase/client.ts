@@ -64,13 +64,13 @@ export const refreshData = async <T>(callback: () => Promise<T>): Promise<T> => 
 
 // Execute an RPC function that returns data rather than querying tables directly
 // This helps avoid RLS recursion issues with policies that reference the same table
-export const executeRPC = async <T>(functionName: string, params?: Record<string, any>): Promise<T> => {
+export const executeRPC = async <T>(functionName: keyof Database['public']['Functions'], params?: Record<string, any>): Promise<T> => {
   try {
     console.log(`Executing RPC function: ${functionName}`, params);
     
     // Use the rpc method with proper parameters
     const { data, error } = await supabase.rpc(
-      functionName,
+      functionName as any,
       params || {}
     );
     
@@ -87,10 +87,16 @@ export const executeRPC = async <T>(functionName: string, params?: Record<string
   }
 };
 
-// Get current user's company ID using the safe RPC function
+// Get current user's company ID using Edge Function
 export const getCurrentUserCompanyId = async (): Promise<string> => {
   try {
-    const data = await executeRPC<string>('get_auth_user_company_id');
+    const { data, error } = await supabase.functions.invoke('get_auth_user_company_id');
+    
+    if (error) {
+      console.error("Error invoking get_auth_user_company_id:", error);
+      throw error;
+    }
+    
     return data;
   } catch (error) {
     console.error("Error getting company ID:", error);

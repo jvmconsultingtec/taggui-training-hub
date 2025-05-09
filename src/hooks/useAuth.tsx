@@ -80,8 +80,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       console.log("Checking admin status in useAuth");
       
-      // Usamos a função rpc diretamente, sem cache
-      const { data, error } = await supabase.rpc('is_admin');
+      // Use the edge function to check admin status
+      const { data, error } = await supabase.functions.invoke('is_admin');
       
       if (error) {
         console.error("Error checking admin status:", error);
