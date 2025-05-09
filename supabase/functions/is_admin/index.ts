@@ -18,16 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    // Get authorization header from request
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Extract user ID from request
+    // Get user ID from request params
     const userId = new URL(req.url).searchParams.get('user_id');
     
     if (!userId) {
@@ -37,46 +28,52 @@ serve(async (req) => {
       });
     }
 
-    // Create a Supabase client with admin role
-    const supabase = createClient(
+    console.log("Verificando status de admin para o usuário:", userId);
+
+    // Usando SERVICE_ROLE_KEY para contornar RLS completamente
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
-        global: {
-          headers: { 'Content-Type': 'application/json' }
-        },
+        global: { headers: { 'Content-Type': 'application/json' } },
+        auth: { persistSession: false }
       }
     );
 
-    // Execute a direct query using service role to bypass RLS
-    const { data, error } = await supabase
+    // Execute consulta direta para verificar se o usuário é admin
+    const { data, error } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', userId)
       .single();
 
     if (error) {
-      console.error("Error checking admin status:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
+      console.error("Erro na consulta de admin:", error);
+      return new Response(JSON.stringify({ 
+        error: error.message,
+        isAdmin: false 
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
+    // Verificar o papel do usuário
     const isAdmin = data?.role === 'ADMIN';
+    console.log("Resultado da verificação de admin:", { userId, role: data?.role, isAdmin });
     
-    // Return the result
+    // Retornar o resultado
     return new Response(JSON.stringify({ isAdmin }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
     
   } catch (error) {
-    console.error('Error checking admin status:', error);
+    console.error('Erro ao verificar status de admin:', error);
     
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
+      isAdmin: false
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

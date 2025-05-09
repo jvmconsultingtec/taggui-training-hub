@@ -34,13 +34,17 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       console.log("Verificando status de admin via Edge Function para:", currentUser.id);
       
-      const response = await fetch(`https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${currentUser.id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${currentSession.access_token}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${currentUser.id}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+            'x-user-id': currentUser.id
+          }
         }
-      });
+      );
       
       if (!response.ok) {
         throw new Error(`Erro na resposta: ${response.status}`);
@@ -48,7 +52,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       
       const result = await response.json();
       console.log("Resultado da verificação de admin:", result);
-      setIsAdmin(result.isAdmin);
+      setIsAdmin(!!result.isAdmin);
     } catch (err) {
       console.error("Erro ao verificar status de admin:", err);
       setIsAdmin(false);
@@ -69,6 +73,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           
           // Verificar status de admin após delay para evitar loops
           if (currentSession?.user) {
+            // Usar setTimeout para garantir que a UI não trava
             setTimeout(() => {
               if (mounted) {
                 checkAdminStatus(currentSession.user, currentSession);

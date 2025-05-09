@@ -4,6 +4,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export const AdminRoute = () => {
   const { user, session, loading } = useAuth();
@@ -21,22 +22,24 @@ export const AdminRoute = () => {
       try {
         console.log("Verificando status de administrador para:", user.id);
         
-        // Usar a Edge Function is_admin para verificar status
+        // Chamar diretamente a Edge Function
         const response = await fetch(`https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${user.id}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
+            'x-user-id': user.id
           }
         });
         
         if (!response.ok) {
-          throw new Error(`Erro na resposta: ${response.status}`);
+          const errorData = await response.json();
+          throw new Error(`Erro na resposta: ${response.status} - ${errorData.error || 'Erro desconhecido'}`);
         }
         
         const result = await response.json();
         console.log("Resultado da verificação de admin:", result);
-        setIsAdmin(result.isAdmin);
+        setIsAdmin(!!result.isAdmin);
       } catch (err) {
         console.error("Erro ao verificar status de admin:", err);
         toast({
