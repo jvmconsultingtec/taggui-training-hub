@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
@@ -23,27 +22,92 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  const [adminCheckComplete, setAdminCheckComplete] = useState(false);
+
+  // Função para verificar o status de administrador
+  const checkAdminStatus = async (userId: string, token: string) => {
+    try {
+      if (!userId) {
+        console.error("No user ID provided for admin check");
+        setIsAdmin(false);
+        setAdminCheckComplete(true);
+        return;
+      }
+
+      console.log("Checking admin status for user:", userId);
+      
+      // Verificar se o usuário tem função ADMIN diretamente na tabela users
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) {
+        console.error("Error fetching user role:", userError);
+      } else if (userData) {
+        console.log("User role from database:", userData.role);
+        const isUserAdmin = userData.role === 'ADMIN';
+        setIsAdmin(isUserAdmin);
+        setAdminCheckComplete(true);
+        console.log("Admin status set to:", isUserAdmin);
+        return;
+      }
+      
+      // Caso não consiga acessar a tabela diretamente, usa a edge function como fallback
+      console.log("Using edge function as fallback to check admin status");
+      const { data, error } = await supabase.functions.invoke('is_admin', {
+        headers: {
+          'x-user-id': userId,
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (error) {
+        console.error("Error checking admin status via edge function:", error);
+        setIsAdmin(false);
+      } else {
+        console.log("Admin status result from edge function:", data);
+        setIsAdmin(!!data);
+      }
+      
+      setAdminCheckComplete(true);
+    } catch (error) {
+      console.error("Exception checking admin status:", error);
+      setIsAdmin(false);
+      setAdminCheckComplete(true);
+    }
+  };
 
   useEffect(() => {
     console.info("Initializing auth state");
+    let mounted = true;
     
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         console.info(`Auth state change: ${event}`, currentSession?.user?.email);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
         
-        if (currentSession?.user) {
-          // Use setTimeout to avoid recursive auth state changes
-          setTimeout(() => {
-            checkAdminStatus(currentSession.user.id);
-          }, 0);
-        } else {
-          setIsAdmin(false);
-          console.info("No active session found");
-          setLoading(false);
+        if (mounted) {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          if (currentSession?.user) {
+            // Reset admin check when user changes
+            setAdminCheckComplete(false);
+            
+            // Use setTimeout to avoid recursive auth state changes
+            setTimeout(() => {
+              if (mounted) {
+                checkAdminStatus(currentSession.user.id, currentSession.access_token);
+              }
+            }, 0);
+          } else {
+            setIsAdmin(false);
+            console.info("No active session found");
+            setLoading(false);
+            setAdminCheckComplete(true);
+          }
         }
       }
     );
@@ -55,71 +119,54 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         
         if (error) {
           console.error("Error initializing auth:", error);
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+            setAdminCheckComplete(true);
+          }
           return;
         }
         
-        if (data.session) {
+        if (data.session && mounted) {
           setSession(data.session);
           setUser(data.session.user);
+          
           // Check admin status with user ID
-          await checkAdminStatus(data.session.user.id);
-        } else {
+          await checkAdminStatus(data.session.user.id, data.session.access_token);
+        } else if (mounted) {
           setLoading(false);
+          setAdminCheckComplete(true);
         }
-        
-        setAuthInitialized(true);
       } catch (err) {
         console.error("Exception in initializeAuth:", err);
-        setLoading(false);
-        setAuthInitialized(true);
+        if (mounted) {
+          setLoading(false);
+          setAdminCheckComplete(true);
+        }
       }
     };
     
     initializeAuth();
     
+    // Update loading state when admin check completes
+    const loadingCheck = () => {
+      if (adminCheckComplete && mounted) {
+        setLoading(false);
+      }
+    };
+    
+    // Monitor for admin check completion
+    const interval = setInterval(loadingCheck, 100);
+    
     return () => {
+      mounted = false;
+      clearInterval(interval);
       subscription.unsubscribe();
     };
   }, []);
   
-  // Function to check admin status
-  const checkAdminStatus = async (userId: string) => {
-    try {
-      console.log("Checking admin status for user:", userId);
-      
-      if (!userId) {
-        console.error("No user ID provided for admin check");
-        setIsAdmin(false);
-        setLoading(false);
-        return;
-      }
-
-      // Use the edge function to check admin status
-      const { data, error } = await supabase.functions.invoke('is_admin', {
-        headers: {
-          'x-user-id': userId
-        }
-      });
-      
-      if (error) {
-        console.error("Error checking admin status:", error);
-        setIsAdmin(false);
-      } else {
-        console.log("Admin status result:", data);
-        setIsAdmin(!!data);
-      }
-      
-      setLoading(false);
-    } catch (error) {
-      console.error("Exception checking admin status:", error);
-      setIsAdmin(false);
-      setLoading(false);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
     setLoading(true);
+    setAdminCheckComplete(false);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -139,6 +186,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           description: error.message,
           variant: "destructive"
         });
+        setLoading(false);
       }
       
       return { error };
@@ -249,7 +297,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     updatePassword, 
   };
 
-  console.log("AuthProvider rendering - isAdmin:", isAdmin, "user:", user?.email);
+  console.log("AuthProvider rendering - isAdmin:", isAdmin, "user:", user?.email, "loading:", loading);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

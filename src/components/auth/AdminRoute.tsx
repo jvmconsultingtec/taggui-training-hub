@@ -10,10 +10,10 @@ export const AdminRoute = () => {
   const [checked, setChecked] = useState(false);
   
   useEffect(() => {
-    console.log("AdminRoute - User:", user?.email);
-    console.log("AdminRoute - Is user admin?", isAdmin);
-    
     if (!loading) {
+      console.log("AdminRoute - Loading complete");
+      console.log("AdminRoute - User:", user?.email);
+      console.log("AdminRoute - Is user admin?", isAdmin);
       setChecked(true);
     }
   }, [user, isAdmin, loading]);
@@ -22,6 +22,10 @@ export const AdminRoute = () => {
   if (loading || !checked) {
     return (
       <div className="flex flex-col gap-4 p-8">
+        <div className="mb-4 text-center">
+          <h2 className="text-2xl font-bold">Verificando permissões</h2>
+          <p className="text-gray-500">Aguarde enquanto verificamos seu acesso...</p>
+        </div>
         <Skeleton className="h-8 w-full" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-8 w-3/4" />

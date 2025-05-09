@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,31 +8,30 @@ import { toast } from "@/hooks/use-toast";
 const Index = () => {
   const navigate = useNavigate();
   const { user, isAdmin, loading } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        console.log("User authenticated:", user.email);
-        console.log("User is admin:", isAdmin);
-        
-        // Add a slight delay to ensure isAdmin has been properly set
-        setTimeout(() => {
-          if (isAdmin) {
-            console.log("Redirecting to admin panel");
-            navigate("/admin");
-            toast({
-              title: "Bem-vindo, Administrador",
-              description: "Você está acessando o painel de administração"
-            });
-          } else {
-            console.log("Redirecting to regular dashboard");
-            navigate("/dashboard");
-          }
-        }, 100);
+    // Evita múltiplas chamadas e redirecionamentos
+    if (!loading && !isRedirecting && user) {
+      console.log("User authenticated:", user.email);
+      console.log("User is admin:", isAdmin);
+      
+      setIsRedirecting(true);
+      
+      if (isAdmin) {
+        console.log("Redirecting to admin panel");
+        navigate("/admin");
+        toast({
+          title: "Bem-vindo, Administrador",
+          description: "Você está acessando o painel de administração"
+        });
       } else {
-        console.log("No user, redirecting to login");
-        navigate("/login");
+        console.log("Redirecting to regular dashboard");
+        navigate("/dashboard");
       }
+    } else if (!loading && !user) {
+      console.log("No user, redirecting to login");
+      navigate("/login");
     }
   }, [user, loading, navigate, isAdmin]);
 

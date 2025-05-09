@@ -52,26 +52,23 @@ serve(async (req) => {
       }
     );
 
-    // Use a direct SQL query to avoid RLS recursion
-    const { data, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .maybeSingle();
+    // Query user role directly without RLS
+    const { data, error } = await supabase.rpc('is_user_admin', {
+      user_id: userId
+    });
     
     if (error) {
-      console.error("Error querying user role:", error);
-      throw error;
+      console.error("Error checking admin status:", error);
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
-    console.log("User role data:", data);
+    console.log("Is admin result:", data);
     
-    // Check if the user is admin based on role
-    const isAdmin = data?.role === 'ADMIN';
-    console.log("Is user admin?", isAdmin);
-
     // Return the result
-    return new Response(JSON.stringify(isAdmin), {
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
