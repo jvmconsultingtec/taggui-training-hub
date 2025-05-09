@@ -38,7 +38,7 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Buscar diretamente da tabela user_groups
+      // Use a direct query to avoid potential RLS recursion issues
       const { data: userGroups, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
@@ -57,10 +57,11 @@ const UserGroups = () => {
         return;
       }
 
-      // Para cada grupo, buscar o número de membros
+      // For each group, safely get the member count
       const enhancedGroups = await Promise.all(
         userGroups.map(async (group) => {
           try {
+            // Use count instead of selecting all to avoid potential large data transfer
             const { count, error: countError } = await supabase
               .from("user_group_members")
               .select("*", { count: "exact", head: true })

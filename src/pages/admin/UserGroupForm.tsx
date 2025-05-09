@@ -31,24 +31,27 @@ const UserGroupForm = () => {
         setLoading(true);
         console.log("Buscando ID da empresa");
         
-        // Buscar o perfil do usuário diretamente (agora com as novas políticas)
-        const { data: userProfile, error: userError } = await supabase
-          .from("users")
-          .select("company_id")
-          .eq("id", user?.id)
-          .single();
-          
-        if (userError) {
-          console.error("Erro ao buscar perfil do usuário:", userError);
-          throw userError;
+        if (!user) {
+          throw new Error("Usuário não autenticado");
         }
         
-        if (!userProfile?.company_id) {
+        // Using the RPC function to avoid RLS recursion issues
+        const { data: companyIdData, error: companyIdError } = await supabase
+          .rpc('get_user_company_id', { 
+            user_id: user.id 
+          });
+          
+        if (companyIdError) {
+          console.error("Erro ao buscar ID da empresa:", companyIdError);
+          throw companyIdError;
+        }
+        
+        if (!companyIdData) {
           throw new Error("ID da empresa não encontrado");
         }
         
-        console.log("ID da empresa obtido:", userProfile.company_id);
-        setCompanyId(userProfile.company_id);
+        console.log("ID da empresa obtido:", companyIdData);
+        setCompanyId(companyIdData);
         
         // Se estamos em modo de edição, carregar também os dados do grupo
         if (isEditMode) {
@@ -66,9 +69,7 @@ const UserGroupForm = () => {
       }
     };
     
-    if (user) {
-      fetchUserCompanyId();
-    }
+    fetchUserCompanyId();
   }, [id, isEditMode, user]);
 
   const loadGroupData = async () => {
