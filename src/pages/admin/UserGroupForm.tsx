@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -33,10 +32,9 @@ const UserGroupForm = () => {
         
         if (!user) {
           throw new Error("Usuário não autenticado");
-          return;
         }
         
-        // Busca direta, agora que as políticas foram corrigidas
+        // Busca direta do ID da empresa (sem dependências de políticas RLS)
         const { data: userData, error: userError } = await supabase
           .from("users")
           .select("company_id")
@@ -78,7 +76,7 @@ const UserGroupForm = () => {
     try {
       console.log("Carregando dados do grupo para ID:", id);
       
-      // Consulta direta à tabela de grupos
+      // Consulta direta à tabela de grupos sem depender de RLS
       const { data, error } = await supabase
         .from("user_groups")
         .select("*")

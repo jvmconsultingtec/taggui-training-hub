@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -37,7 +38,7 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Buscar grupos diretamente (com as novas políticas)
+      // Buscar grupos diretamente sem depender de RLS
       const { data: userGroups, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")

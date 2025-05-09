@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -52,6 +51,7 @@ const GroupMembers = () => {
       try {
         if (!groupId) return;
         
+        // Consulta direta sem depender de RLS
         const { data, error } = await supabase
           .from("user_groups")
           .select("*")
@@ -82,10 +82,25 @@ const GroupMembers = () => {
       try {
         setLoadingUsers(true);
         
-        // Busca direta com as novas políticas
+        // Buscar primeiro o usuário autenticado para obter o company_id
+        if (!user) {
+          throw new Error("Usuário não autenticado");
+        }
+        
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("company_id")
+          .eq("id", user.id)
+          .single();
+          
+        if (userError) throw userError;
+        if (!userData?.company_id) throw new Error("ID da empresa não encontrado");
+        
+        // Agora buscar todos os usuários da mesma empresa
         const { data: usersData, error: usersError } = await supabase
           .from("users")
-          .select("*");
+          .select("*")
+          .eq("company_id", userData.company_id);
           
         if (usersError) throw usersError;
         
@@ -118,7 +133,7 @@ const GroupMembers = () => {
     };
     
     fetchUsers();
-  }, [groupId]);
+  }, [groupId, user]);
 
   // Filtrar usuários com base na pesquisa
   useEffect(() => {
