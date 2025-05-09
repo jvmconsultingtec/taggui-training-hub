@@ -33,25 +33,27 @@ const UserGroupForm = () => {
         
         if (!user) {
           throw new Error("Usuário não autenticado");
+          return;
         }
         
-        // Using the RPC function to avoid RLS recursion issues
-        const { data: companyIdData, error: companyIdError } = await supabase
-          .rpc('get_user_company_id', { 
-            user_id: user.id 
-          });
+        // Busca direta, agora que as políticas foram corrigidas
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("company_id")
+          .eq("id", user.id)
+          .single();
           
-        if (companyIdError) {
-          console.error("Erro ao buscar ID da empresa:", companyIdError);
-          throw companyIdError;
+        if (userError) {
+          console.error("Erro ao buscar ID da empresa:", userError);
+          throw userError;
         }
         
-        if (!companyIdData) {
+        if (!userData?.company_id) {
           throw new Error("ID da empresa não encontrado");
         }
         
-        console.log("ID da empresa obtido:", companyIdData);
-        setCompanyId(companyIdData);
+        console.log("ID da empresa obtido:", userData.company_id);
+        setCompanyId(userData.company_id);
         
         // Se estamos em modo de edição, carregar também os dados do grupo
         if (isEditMode) {

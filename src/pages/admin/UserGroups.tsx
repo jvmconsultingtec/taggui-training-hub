@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/layout/Layout";
@@ -38,7 +37,7 @@ const UserGroups = () => {
     try {
       setLoading(true);
       
-      // Use a direct query to avoid potential RLS recursion issues
+      // Buscar grupos diretamente (com as novas políticas)
       const { data: userGroups, error: groupsError } = await supabase
         .from("user_groups")
         .select("*")
@@ -57,11 +56,13 @@ const UserGroups = () => {
         return;
       }
 
-      // For each group, safely get the member count
+      console.log("Grupos obtidos:", userGroups);
+
+      // Para cada grupo, buscar o número de membros
       const enhancedGroups = await Promise.all(
         userGroups.map(async (group) => {
           try {
-            // Use count instead of selecting all to avoid potential large data transfer
+            // Usar count para evitar transferência de dados grandes
             const { count, error: countError } = await supabase
               .from("user_group_members")
               .select("*", { count: "exact", head: true })
@@ -134,12 +135,7 @@ const UserGroups = () => {
 
       if (membersError) {
         console.error("Erro ao remover membros:", membersError);
-        toast({
-          title: "Erro",
-          description: "Não foi possível remover os membros do grupo",
-          variant: "destructive",
-        });
-        return;
+        throw membersError;
       }
 
       // Remover atribuições de treinamentos ao grupo
@@ -148,14 +144,9 @@ const UserGroups = () => {
         .delete()
         .eq("group_id", id);
 
-      if (assignmentsError) {
+      if (assignmentsError && !assignmentsError.message.includes("no rows")) {
         console.error("Erro ao remover atribuições de treinamentos:", assignmentsError);
-        toast({
-          title: "Erro",
-          description: "Não foi possível remover atribuições de treinamentos do grupo",
-          variant: "destructive",
-        });
-        return;
+        throw assignmentsError;
       }
 
       // Excluir o grupo
@@ -166,12 +157,7 @@ const UserGroups = () => {
 
       if (groupError) {
         console.error("Erro ao excluir grupo:", groupError);
-        toast({
-          title: "Erro",
-          description: "Não foi possível excluir o grupo",
-          variant: "destructive",
-        });
-        return;
+        throw groupError;
       }
 
       toast({
@@ -181,11 +167,11 @@ const UserGroups = () => {
 
       // Atualizar a lista de grupos
       fetchGroups();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao excluir grupo:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível excluir o grupo",
+        description: error.message || "Não foi possível excluir o grupo",
         variant: "destructive",
       });
     }

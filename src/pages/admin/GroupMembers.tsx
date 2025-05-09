@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/table";
 import { Search, Loader, Users, UserPlus, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { executeRPC } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -75,7 +74,7 @@ const GroupMembers = () => {
     };
     
     fetchGroup();
-  }, [groupId]);
+  }, [groupId, navigate]);
 
   // Buscar todos usuários da empresa
   useEffect(() => {
@@ -83,12 +82,15 @@ const GroupMembers = () => {
       try {
         setLoadingUsers(true);
         
-        // Usando a função RPC para evitar recursão infinita
-        const usersData = await executeRPC<User[]>('fetch_company_users');
+        // Busca direta com as novas políticas
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("*");
+          
+        if (usersError) throw usersError;
         
-        if (!usersData) throw new Error("Não foi possível buscar os usuários");
-        setAllUsers(usersData);
-        setFilteredUsers(usersData);
+        setAllUsers(usersData || []);
+        setFilteredUsers(usersData || []);
         
         // Buscar membros atuais do grupo
         if (groupId) {
