@@ -80,11 +80,17 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       console.log("Checking admin status in useAuth");
       
-      // Usamos a função executeRPC do client para evitar problemas de cache
-      const isUserAdmin = await supabase.functions.invoke('is_admin');
+      // Usamos a função rpc diretamente, sem cache
+      const { data, error } = await supabase.rpc('is_admin');
       
-      console.log("useAuth - Is user admin?", isUserAdmin.data);
-      setIsAdmin(!!isUserAdmin.data);
+      if (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      } else {
+        console.log("useAuth - Is user admin?", data);
+        setIsAdmin(!!data);
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error("Exception checking admin status:", error);
