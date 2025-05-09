@@ -27,9 +27,9 @@ export interface TrainingCardProps {
 }
 
 const statusIcons = {
-  not_started: <Clock className="h-4 w-4" />,
-  in_progress: <Play className="h-4 w-4" />,
-  completed: <Check className="h-4 w-4" />
+  not_started: <Clock className="h-4 w-4 mr-1" />,
+  in_progress: <Play className="h-4 w-4 mr-1" />,
+  completed: <Check className="h-4 w-4 mr-1" />
 };
 
 const statusLabels = {
@@ -39,9 +39,9 @@ const statusLabels = {
 };
 
 const statusColors = {
-  not_started: "bg-gray-200 text-gray-800",
-  in_progress: "bg-blue-500 text-white",
-  completed: "bg-green-500 text-white"
+  not_started: "bg-gray-100 text-gray-700",
+  in_progress: "bg-blue-100 text-blue-700",
+  completed: "bg-green-100 text-green-700"
 };
 
 const TrainingCard = (props: TrainingCardProps) => {
@@ -66,77 +66,55 @@ const TrainingCard = (props: TrainingCardProps) => {
 
   return (
     <Link to={`/trainings/${id}`} className="block group">
-      <div className="border border-gray-200 rounded-md p-4 group-hover:shadow-md transition-shadow">
-        <div className="relative">
-          <div className="aspect-video rounded-md bg-gray-200 overflow-hidden mb-3">
-            {thumbnailUrl ? (
-              <img 
-                src={thumbnailUrl} 
-                alt={title} 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                <Play className="text-gray-400" size={40} />
-              </div>
-            )}
+      <div className="border border-gray-200 rounded-md overflow-hidden transition-shadow hover:shadow-md">
+        {/* Training info header */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex justify-between items-start gap-2 mb-1">
+            <h3 className="font-medium text-gray-900 group-hover:text-taggui-primary transition-colors line-clamp-1">{title}</h3>
             
-            {/* Play overlay */}
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <div className="h-12 w-12 rounded-full bg-white/90 flex items-center justify-center">
-                <Play className="text-taggui-primary h-6 w-6" fill="currentColor" />
-              </div>
-            </div>
-            
-            {/* Duration badge */}
-            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-              {duration} min
+            <div className={`flex items-center px-2 py-1 rounded-full text-xs ${statusColors[status]}`}>
+              {statusIcons[status]}
+              <span>{statusLabels[status]}</span>
             </div>
           </div>
           
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium text-gray-900 group-hover:text-taggui-primary transition-colors">{title}</h3>
-              <span className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${statusColors[status]}`}>
-                {statusIcons[status]}
-                <span>{statusLabels[status]}</span>
-              </span>
-            </div>
+          {description && (
+            <p className="text-sm text-gray-600 line-clamp-2 mb-2">{description}</p>
+          )}
+          
+          <div className="flex items-center text-xs text-gray-500">
+            <span className="flex items-center">
+              <Clock className="h-3 w-3 mr-1" />
+              {duration} min
+            </span>
             
-            {description && (
-              <p className="text-sm text-gray-600 line-clamp-2">{description}</p>
-            )}
-            
-            <div className="pt-1">
-              <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${
-                    status === "completed" ? "bg-green-500" : 
-                    status === "in_progress" ? "bg-blue-500" : "bg-gray-300"
-                  }`}
-                  style={{ width: `${progressWidth}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between mt-1 text-xs text-gray-500">
-                <span>Status</span>
-                <span className="font-medium">{statusLabels[status]}</span>
-              </div>
-            </div>
-            
-            {/* Display tags */}
             {tags && tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1 pt-2">
-                {tags.map((tag, index) => (
+              <div className="flex ml-3 gap-1">
+                {tags.slice(0, 2).map((tag, index) => (
                   <span 
-                    key={index} 
+                    key={index}
                     className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs"
                   >
                     {tag}
                   </span>
                 ))}
+                {tags.length > 2 && (
+                  <span className="text-gray-500">+{tags.length - 2}</span>
+                )}
               </div>
             )}
           </div>
+        </div>
+        
+        {/* Progress bar */}
+        <div className="h-1 w-full bg-gray-100">
+          <div 
+            className={`h-full ${
+              status === "completed" ? "bg-green-500" : 
+              status === "in_progress" ? "bg-blue-500" : "bg-gray-200"
+            }`}
+            style={{ width: `${progressWidth}%` }}
+          />
         </div>
       </div>
     </Link>
