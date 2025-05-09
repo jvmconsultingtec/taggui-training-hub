@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -11,18 +12,23 @@ const Index = () => {
   useEffect(() => {
     if (!loading) {
       if (user) {
-        console.log("User authenticated, isAdmin:", isAdmin);
+        console.log("User authenticated:", user.email);
+        console.log("User is admin:", isAdmin);
         
         // Add a slight delay to ensure isAdmin has been properly set
         setTimeout(() => {
           if (isAdmin) {
             console.log("Redirecting to admin panel");
             navigate("/admin");
+            toast({
+              title: "Bem-vindo, Administrador",
+              description: "Você está acessando o painel de administração"
+            });
           } else {
             console.log("Redirecting to regular dashboard");
             navigate("/dashboard");
           }
-        }, 50);
+        }, 100);
       } else {
         console.log("No user, redirecting to login");
         navigate("/login");

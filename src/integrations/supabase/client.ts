@@ -62,15 +62,32 @@ export const refreshData = async <T>(callback: () => Promise<T>): Promise<T> => 
   }
 };
 
+// Tipos permitidos para funções RPC, derivado da sua base de dados
+type AllowedRpcFunctions = 
+  | "user_has_training_access" 
+  | "is_user_admin"
+  | "check_same_company_access"
+  | "check_user_access"
+  | "check_user_access_for_users"
+  | "can_access_user_group"
+  | "can_access_group_member"
+  | "user_belongs_to_company"
+  | "get_current_user_company_id"
+  | "fetch_company_users"
+  | "get_user_company_id"
+  | "is_admin"
+  | "get_auth_user_company_id"
+  | "promover_a_admin"
+  | "criar_usuario";
+
 // Execute an RPC function that returns data rather than querying tables directly
 // This helps avoid RLS recursion issues with policies that reference the same table
-export const executeRPC = async <T>(functionName: string, params?: Record<string, any>): Promise<T> => {
+export const executeRPC = async <T>(functionName: AllowedRpcFunctions, params?: Record<string, any>): Promise<T> => {
   try {
     console.log(`Executing RPC function: ${functionName}`, params);
     
-    // Using any to bypass TypeScript checking since we're dynamically using function names
     const { data, error } = await supabase.rpc(
-      functionName as any,
+      functionName,
       params || {}
     );
     
@@ -93,11 +110,15 @@ export const getCurrentUserCompanyId = async (): Promise<string> => {
     const session = await supabase.auth.getSession();
     const userId = session.data.session?.user?.id;
     
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+    
     console.log("Getting company ID for user:", userId);
     
     const { data, error } = await supabase.functions.invoke('get_auth_user_company_id', {
       headers: {
-        'x-user-id': userId || ''
+        'x-user-id': userId
       }
     });
     

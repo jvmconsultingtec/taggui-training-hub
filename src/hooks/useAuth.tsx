@@ -23,6 +23,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     console.info("Initializing auth state");
@@ -30,7 +31,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.info(`Auth state change: ${event}`, currentSession);
+        console.info(`Auth state change: ${event}`, currentSession?.user?.email);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -66,9 +67,12 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         } else {
           setLoading(false);
         }
+        
+        setAuthInitialized(true);
       } catch (err) {
         console.error("Exception in initializeAuth:", err);
         setLoading(false);
+        setAuthInitialized(true);
       }
     };
     
@@ -84,10 +88,17 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     try {
       console.log("Checking admin status for user:", userId);
       
+      if (!userId) {
+        console.error("No user ID provided for admin check");
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+
       // Use the edge function to check admin status
       const { data, error } = await supabase.functions.invoke('is_admin', {
         headers: {
-          'x-user-id': userId || ''
+          'x-user-id': userId
         }
       });
       
@@ -118,12 +129,27 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       if (!error) {
         console.log("Sign in successful");
         // Auth state change will handle setting user and session
+        toast({
+          title: "Login bem-sucedido",
+          description: "Você foi conectado com sucesso"
+        });
+      } else {
+        toast({
+          title: "Erro ao fazer login",
+          description: error.message,
+          variant: "destructive"
+        });
       }
       
       return { error };
     } catch (error) {
       console.error("Sign in error:", error);
       setLoading(false);
+      toast({
+        title: "Erro ao fazer login",
+        description: "Ocorreu um erro inesperado",
+        variant: "destructive"
+      });
       return { error };
     }
   };
@@ -139,10 +165,28 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         },
       });
       
+      if (!error) {
+        toast({
+          title: "Registro bem-sucedido",
+          description: "Sua conta foi criada com sucesso"
+        });
+      } else {
+        toast({
+          title: "Erro ao registrar",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+      
       return { error };
     } catch (error) {
       console.error("Sign up error:", error);
       setLoading(false);
+      toast({
+        title: "Erro ao registrar",
+        description: "Ocorreu um erro inesperado",
+        variant: "destructive"
+      });
       return { error };
     }
   };
@@ -204,6 +248,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     resetPassword,
     updatePassword, 
   };
+
+  console.log("AuthProvider rendering - isAdmin:", isAdmin, "user:", user?.email);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
