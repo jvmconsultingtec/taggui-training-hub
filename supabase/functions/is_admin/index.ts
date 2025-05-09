@@ -37,20 +37,18 @@ serve(async (req) => {
       });
     }
 
-    // Create a Supabase client with the admin's JWT
+    // Create a Supabase client with admin role
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         global: {
-          headers: {
-            Authorization: authHeader,
-          },
+          headers: { 'Content-Type': 'application/json' }
         },
       }
     );
 
-    // Execute a simple direct query to avoid RLS recursion
+    // Execute a direct query using service role to bypass RLS
     const { data, error } = await supabase
       .from('users')
       .select('role')

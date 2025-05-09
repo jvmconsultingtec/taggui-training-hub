@@ -27,6 +27,7 @@ import UserGroupForm from "./pages/admin/UserGroupForm";
 import GroupMembers from "./pages/admin/GroupMembers";
 import UserManagement from "./pages/admin/UserManagement";
 import TrainingGroupAssignment from "./pages/admin/TrainingGroupAssignment";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,7 +69,8 @@ const App = () => (
             
             {/* Admin-only routes */}
             <Route element={<AdminRoute />}>
-              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/panel" element={<AdminPanel />} />
               <Route path="/admin/trainings" element={<TrainingsList />} />
               <Route path="/admin/trainings/new" element={<TrainingForm />} />
               <Route path="/admin/trainings/edit/:id" element={<TrainingForm />} />

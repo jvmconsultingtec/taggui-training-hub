@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 export const AdminRoute = () => {
@@ -22,28 +21,29 @@ export const AdminRoute = () => {
       try {
         console.log("Verificando status de administrador para:", user.id);
         
-        // Abordagem simples: consulta direta à tabela users
-        const { data, error } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
+        // Usar a Edge Function is_admin para verificar status
+        const response = await fetch(`https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${user.id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          }
+        });
         
-        if (error) {
-          console.error("Erro ao verificar status de admin:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível verificar suas permissões",
-            variant: "destructive"
-          });
-          setIsAdmin(false);
-        } else {
-          const adminStatus = data?.role === 'ADMIN';
-          console.log("Status admin:", adminStatus);
-          setIsAdmin(adminStatus);
+        if (!response.ok) {
+          throw new Error(`Erro na resposta: ${response.status}`);
         }
+        
+        const result = await response.json();
+        console.log("Resultado da verificação de admin:", result);
+        setIsAdmin(result.isAdmin);
       } catch (err) {
         console.error("Erro ao verificar status de admin:", err);
+        toast({
+          title: "Erro",
+          description: "Não foi possível verificar suas permissões de administrador",
+          variant: "destructive"
+        });
         setIsAdmin(false);
       } finally {
         setCheckingAdmin(false);
@@ -58,7 +58,7 @@ export const AdminRoute = () => {
     return (
       <div className="flex flex-col gap-4 p-8">
         <div className="mb-4 text-center">
-          <h2 className="text-2xl font-bold">Verificando permissões</h2>
+          <h2 className="text-2xl font-bold">Verificando permissões de administrador</h2>
           <p className="text-gray-500">Aguarde enquanto verificamos seu acesso...</p>
         </div>
         <Skeleton className="h-8 w-full" />

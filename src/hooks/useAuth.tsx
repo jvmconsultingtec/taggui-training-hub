@@ -24,28 +24,31 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Função para verificar se o usuário é admin
-  const checkAdminStatus = async (currentUser: User) => {
-    if (!currentUser) {
+  // Função para verificar se o usuário é admin usando a Edge Function
+  const checkAdminStatus = async (currentUser: User, currentSession: Session) => {
+    if (!currentUser || !currentSession) {
       setIsAdmin(false);
       return;
     }
     
     try {
-      // Abordagem simplificada - verificar diretamente o papel do usuário
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', currentUser.id)
-        .maybeSingle();
-        
-      if (error) {
-        console.error("Erro ao verificar status de admin:", error);
-        setIsAdmin(false);
-        return;
+      console.log("Verificando status de admin via Edge Function para:", currentUser.id);
+      
+      const response = await fetch(`https://deudqfjiieufqenzfclv.supabase.co/functions/v1/is_admin?user_id=${currentUser.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro na resposta: ${response.status}`);
       }
       
-      setIsAdmin(data?.role === 'ADMIN');
+      const result = await response.json();
+      console.log("Resultado da verificação de admin:", result);
+      setIsAdmin(result.isAdmin);
     } catch (err) {
       console.error("Erro ao verificar status de admin:", err);
       setIsAdmin(false);
@@ -68,7 +71,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           if (currentSession?.user) {
             setTimeout(() => {
               if (mounted) {
-                checkAdminStatus(currentSession.user);
+                checkAdminStatus(currentSession.user, currentSession);
               }
             }, 0);
           } else {
@@ -98,7 +101,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           setUser(data.session.user);
           
           // Verificar status de admin
-          await checkAdminStatus(data.session.user);
+          await checkAdminStatus(data.session.user, data.session);
         }
         
         if (mounted) {

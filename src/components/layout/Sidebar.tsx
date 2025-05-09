@@ -13,7 +13,6 @@ import {
   X,
   ShieldCheck
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import TagguiLogo from "./TagguiLogo";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -47,6 +46,8 @@ const Sidebar = () => {
   const { user, isAdmin } = useAuth();
   
   const isActive = (path: string) => location.pathname.startsWith(path);
+  
+  console.log("Sidebar - Status de admin:", isAdmin);
   
   return (
     <div 
