@@ -81,7 +81,13 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       console.log("Checking admin status in useAuth");
       
       // Use the edge function to check admin status
-      const { data, error } = await supabase.functions.invoke('is_admin');
+      const userId = user?.id || (await supabase.auth.getUser()).data.user?.id;
+      
+      const { data, error } = await supabase.functions.invoke('is_admin', {
+        headers: {
+          'x-user-id': userId || ''
+        }
+      });
       
       if (error) {
         console.error("Error checking admin status:", error);

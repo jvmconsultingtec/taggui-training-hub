@@ -37,13 +37,20 @@ serve(async (req) => {
       }
     );
 
-    // Check if the user is an admin using the SQL function
-    const { data, error } = await supabase.rpc('is_admin');
+    // Use a direct SQL query to avoid RLS recursion
+    const { data, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', req.headers.get('x-user-id') || '')
+      .maybeSingle();
     
     if (error) throw error;
+    
+    // Check if the user is admin based on role
+    const isAdmin = data?.role === 'ADMIN';
 
     // Return the result
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(isAdmin), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

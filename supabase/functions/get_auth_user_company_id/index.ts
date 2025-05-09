@@ -37,13 +37,17 @@ serve(async (req) => {
       }
     );
 
-    // Get company ID using the SQL function
-    const { data, error } = await supabase.rpc('get_auth_user_company_id');
+    // Use direct query to avoid RLS recursion
+    const { data, error } = await supabase
+      .from('users')
+      .select('company_id')
+      .eq('id', req.headers.get('x-user-id') || '')
+      .maybeSingle();
     
     if (error) throw error;
 
     // Return the company ID
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(data?.company_id), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
