@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   BarChart, 
   VideoIcon, 
@@ -43,15 +43,9 @@ const NavItem = ({ to, icon, label, isActive, isCollapsed }: NavItemProps) => {
 const Sidebar = () => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin } = useAuth();
   
   const isActive = (path: string) => location.pathname.startsWith(path);
-  
-  useEffect(() => {
-    console.log("Sidebar rendering - user:", user?.email);
-    console.log("Sidebar rendering - isAdmin:", isAdmin);
-    console.log("Sidebar rendering - loading:", loading);
-  }, [user, isAdmin, loading]);
   
   return (
     <div 
@@ -120,7 +114,7 @@ const Sidebar = () => {
           isCollapsed={collapsed}
         />
         
-        {isAdmin && !loading && (
+        {isAdmin && (
           <div className="mt-6 border-t pt-6 border-gray-200">
             <NavItem 
               to="/admin" 

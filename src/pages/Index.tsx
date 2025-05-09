@@ -3,37 +3,26 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, loading } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     // Evita múltiplas chamadas e redirecionamentos
-    if (!loading && !isRedirecting && user) {
-      console.log("User authenticated:", user.email);
-      console.log("User is admin:", isAdmin);
-      
+    if (!loading && !isRedirecting) {
       setIsRedirecting(true);
       
-      if (isAdmin) {
-        console.log("Redirecting to admin panel");
-        navigate("/admin");
-        toast({
-          title: "Bem-vindo, Administrador",
-          description: "Você está acessando o painel de administração"
-        });
-      } else {
-        console.log("Redirecting to regular dashboard");
+      if (user) {
+        console.log("User authenticated:", user.email);
         navigate("/dashboard");
+      } else {
+        console.log("No user, redirecting to login");
+        navigate("/login");
       }
-    } else if (!loading && !user) {
-      console.log("No user, redirecting to login");
-      navigate("/login");
     }
-  }, [user, loading, navigate, isAdmin]);
+  }, [user, loading, navigate]);
 
   // Show loading while the auth state is being determined
   if (loading) {

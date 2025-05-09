@@ -37,8 +37,6 @@ serve(async (req) => {
       });
     }
 
-    console.log("Checking admin status for user:", userId);
-
     // Create a Supabase client with the user's JWT
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -52,23 +50,25 @@ serve(async (req) => {
       }
     );
 
-    // Query user role directly without RLS
-    const { data, error } = await supabase.rpc('is_user_admin', {
-      user_id: userId
-    });
+    // Query user role directly
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
     
-    if (error) {
-      console.error("Error checking admin status:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
+    if (userError) {
+      console.error("Error checking admin status:", userError);
+      return new Response(JSON.stringify({ error: userError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
-    console.log("Is admin result:", data);
+    const isAdmin = userData?.role === 'ADMIN';
     
     // Return the result
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify(isAdmin), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

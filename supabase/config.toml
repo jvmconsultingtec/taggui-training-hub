@@ -61,9 +61,3 @@ enable_confirmations = false
 enabled = true
 # Port to serve Edge Functions on.
 port = 54321
-
-[functions.is_admin]
-verify_jwt = true
-
-[functions.get_auth_user_company_id]
-verify_jwt = true
