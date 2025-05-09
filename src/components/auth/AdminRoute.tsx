@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const AdminRoute = () => {
-  const { user, session, loading } = useAuth();
+  const { user, session, loading, isAdmin } = useAuth();
   
   // Mostrar carregamento enquanto verifica autenticação
   if (loading) {
@@ -29,16 +29,13 @@ export const AdminRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // Fazer uma verificação direta se o usuário tem role de ADMIN
-  const isAdmin = user.app_metadata?.role === 'ADMIN' || 
-                 user.user_metadata?.role === 'ADMIN';
-  
+  // Verificar se o usuário é admin
   if (!isAdmin) {
     console.log("Usuário não é administrador, redirecionando para dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
   // Exibir conteúdo somente se o usuário for administrador
-  console.log("AdminRoute - User is admin, showing admin content");
+  console.log("AdminRoute - Usuário é admin, mostrando conteúdo admin");
   return <Outlet />;
 };

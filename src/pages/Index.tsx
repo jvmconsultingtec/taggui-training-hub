@@ -10,21 +10,20 @@ const Index = () => {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    // Evita múltiplas chamadas e redirecionamentos
     if (!loading && !isRedirecting) {
       setIsRedirecting(true);
       
       if (user) {
-        console.log("User authenticated:", user.email);
+        console.log("Usuário autenticado, redirecionando para dashboard");
         navigate("/dashboard");
       } else {
-        console.log("No user, redirecting to login");
+        console.log("Nenhum usuário, redirecionando para login");
         navigate("/login");
       }
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, isRedirecting]);
 
-  // Show loading while the auth state is being determined
+  // Mostrar carregamento enquanto verifica autenticação
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen space-y-4 p-4">

@@ -24,40 +24,62 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Função para verificar se o usuário é admin
+  const checkAdminStatus = async (userId: string) => {
+    try {
+      // Tentar verificar pelo metadata primeiro (forma mais rápida)
+      const userRole = user?.app_metadata?.role || user?.user_metadata?.role;
+      
+      if (userRole === 'ADMIN') {
+        setIsAdmin(true);
+        return;
+      }
+      
+      // Tentativa de verificar através do banco de dados diretamente
+      const { data, error } = await supabase.rpc('is_user_admin', { user_id: userId });
+      
+      if (!error && data) {
+        setIsAdmin(true);
+        return;
+      }
+      
+      setIsAdmin(false);
+    } catch (err) {
+      console.error("Erro ao verificar status de admin:", err);
+      setIsAdmin(false);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     
-    // Set up the auth state listener
+    // Configurar o listener de mudança de estado de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.info(`Auth state change: ${event}`, currentSession?.user?.email);
+        console.info(`Mudança no estado de autenticação: ${event}`, currentSession?.user?.email);
         
         if (mounted) {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
           
           if (currentSession?.user) {
-            // Verificar se o usuário é admin pelos metadados
-            const userRole = currentSession.user.app_metadata?.role || 
-                            currentSession.user.user_metadata?.role;
-            setIsAdmin(userRole === 'ADMIN');
+            await checkAdminStatus(currentSession.user.id);
           } else {
             setIsAdmin(false);
           }
           
-          // Finalize loading state
           setLoading(false);
         }
       }
     );
     
-    // Get the initial session
+    // Obter a sessão inicial
     const initializeAuth = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error("Error initializing auth:", error);
+          console.error("Erro ao inicializar autenticação:", error);
           if (mounted) {
             setLoading(false);
           }
@@ -68,17 +90,14 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
           setSession(data.session);
           setUser(data.session.user);
           
-          // Verificar se o usuário é admin pelos metadados
-          const userRole = data.session.user.app_metadata?.role || 
-                          data.session.user.user_metadata?.role;
-          setIsAdmin(userRole === 'ADMIN');
+          await checkAdminStatus(data.session.user.id);
         }
         
         if (mounted) {
           setLoading(false);
         }
       } catch (err) {
-        console.error("Exception in initializeAuth:", err);
+        console.error("Exceção em initializeAuth:", err);
         if (mounted) {
           setLoading(false);
         }
@@ -102,7 +121,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       });
       
       if (!error) {
-        console.log("Sign in successful");
+        console.log("Login bem-sucedido");
         toast({
           title: "Login bem-sucedido",
           description: "Você foi conectado com sucesso"
@@ -118,7 +137,7 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       
       return { error };
     } catch (error) {
-      console.error("Sign in error:", error);
+      console.error("Erro de login:", error);
       setLoading(false);
       toast({
         title: "Erro ao fazer login",
