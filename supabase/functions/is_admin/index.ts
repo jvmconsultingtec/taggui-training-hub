@@ -30,7 +30,7 @@ serve(async (req) => {
 
     console.log("Verificando status de admin para o usuário:", userId);
 
-    // Use executar SQL direto em vez de query builder para evitar problemas de permissão
+    // Usar Service Role Key para bypass de RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -40,16 +40,17 @@ serve(async (req) => {
       }
     );
     
-    // Execute função SQL RPC is_user_admin que já existe e é SECURITY DEFINER
-    const { data, error } = await supabaseClient.rpc(
-      'is_user_admin', 
-      { user_id: userId }
-    );
+    // Verificar diretamente na tabela de usuários
+    const { data: userData, error: userError } = await supabaseClient
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
 
-    if (error) {
-      console.error("Erro ao chamar função is_user_admin:", error);
+    if (userError) {
+      console.error("Erro ao buscar usuário:", userError);
       return new Response(JSON.stringify({ 
-        error: error.message,
+        error: userError.message,
         isAdmin: false 
       }), {
         status: 500,
@@ -57,8 +58,8 @@ serve(async (req) => {
       });
     }
     
-    const isAdmin = !!data;
-    console.log("Resultado da verificação de admin via is_user_admin:", { userId, isAdmin });
+    const isAdmin = userData?.role === 'ADMIN';
+    console.log("Resultado da verificação de admin:", { userId, role: userData?.role, isAdmin });
     
     return new Response(JSON.stringify({ isAdmin }), {
       status: 200,
