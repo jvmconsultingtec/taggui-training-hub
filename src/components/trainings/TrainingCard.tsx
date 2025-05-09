@@ -22,6 +22,7 @@ export interface TrainingCardProps {
     video_type: "YOUTUBE" | "UPLOAD";
     video_url: string;
     tags?: string[] | null;
+    status?: TrainingStatus;
   };
 }
 
@@ -53,7 +54,7 @@ const TrainingCard = (props: TrainingCardProps) => {
     video_url = props.video_url || props.training?.video_url,
     video_type = props.video_type || props.training?.video_type,
     progress = 0,
-    status = "not_started",
+    status = props.training?.status || "not_started",
     thumbnailUrl
   } = props;
 

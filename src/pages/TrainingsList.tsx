@@ -5,8 +5,9 @@ import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Video, Users } from "lucide-react";
-import TrainingCard from "@/components/trainings/TrainingCard";
+import { PlusCircle, Search, Video, Users, Clock, Play, Check } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -20,7 +21,26 @@ interface Training {
   duration_min: number;
   company_id: string;
   created_at: string;
+  status?: string;
 }
+
+const statusIcons = {
+  not_started: <Clock className="h-4 w-4 mr-1" />,
+  in_progress: <Play className="h-4 w-4 mr-1" />,
+  completed: <Check className="h-4 w-4 mr-1" />
+};
+
+const statusLabels = {
+  not_started: "Não iniciado",
+  in_progress: "Em andamento",
+  completed: "Concluído"
+};
+
+const statusColors = {
+  not_started: "bg-gray-200 text-gray-800",
+  in_progress: "bg-blue-500 text-white",
+  completed: "bg-green-500 text-white"
+};
 
 const TrainingsList = () => {
   const navigate = useNavigate();
@@ -79,6 +99,25 @@ const TrainingsList = () => {
     setFilteredTrainings(filtered);
   }, [searchQuery, trainings]);
 
+  const getStatusBadge = (training: Training) => {
+    const status = training.status || "not_started";
+    
+    return (
+      <Badge 
+        className={`flex items-center ${
+          status === "completed" ? "bg-green-500 text-white" : 
+          status === "in_progress" ? "bg-blue-500 text-white" : 
+          "bg-gray-200 text-gray-800"
+        }`}
+      >
+        {statusIcons[status as keyof typeof statusIcons] || statusIcons.not_started}
+        <span>
+          {statusLabels[status as keyof typeof statusLabels] || statusLabels.not_started}
+        </span>
+      </Badge>
+    );
+  };
+
   return (
     <Layout>
       <div className="container mx-auto py-6">
@@ -121,51 +160,68 @@ const TrainingsList = () => {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         ) : filteredTrainings.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTrainings.map((training) => (
-              <div key={training.id} className="relative">
-                <TrainingCard
-                  id={training.id}
-                  title={training.title}
-                  description={training.description}
-                  video_url={training.video_url}
-                  duration={training.duration_min}
-                  video_type={training.video_type}
-                />
-                
-                {isAdmin && (
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <Button 
-                      variant="secondary" 
-                      size="icon" 
-                      className="h-8 w-8 bg-white/90 hover:bg-white"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        navigate(`/admin/trainings/${training.id}/groups`);
-                      }}
-                      title="Atribuir a grupos"
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-1/3">Treinamento</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Duração</TableHead>
+                    <TableHead>Status</TableHead>
+                    {isAdmin && <TableHead className="text-right">Ações</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTrainings.map((training) => (
+                    <TableRow 
+                      key={training.id} 
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => navigate(`/trainings/${training.id}`)}
                     >
-                      <Users size={16} />
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="icon" 
-                      className="h-8 w-8 bg-white/90 hover:bg-white"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        navigate(`/trainings/edit/${training.id}`);
-                      }}
-                      title="Editar treinamento"
-                    >
-                      <Video size={16} />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                      <TableCell className="font-medium">{training.title}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {training.description?.substring(0, 100) || "Sem descrição"}
+                        {training.description && training.description.length > 100 ? "..." : ""}
+                      </TableCell>
+                      <TableCell>{training.duration_min} min</TableCell>
+                      <TableCell>{getStatusBadge(training)}</TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/admin/trainings/${training.id}/groups`);
+                              }}
+                              title="Atribuir a grupos"
+                            >
+                              <Users size={16} />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/trainings/edit/${training.id}`);
+                              }}
+                              title="Editar treinamento"
+                            >
+                              <Video size={16} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardHeader>
