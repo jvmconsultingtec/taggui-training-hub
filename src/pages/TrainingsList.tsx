@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import { fetchUserTrainingProgress } from "@/services/api";
+
+type TrainingStatus = "not_started" | "in_progress" | "completed";
 
 interface Training {
   id: string;
@@ -21,7 +24,7 @@ interface Training {
   duration_min: number;
   company_id: string;
   created_at: string;
-  status?: string;
+  status?: TrainingStatus;
 }
 
 const statusIcons = {
@@ -44,13 +47,17 @@ const statusColors = {
 
 const TrainingsList = () => {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTrainings, setFilteredTrainings] = useState<Training[]>([]);
+  const [progressMap, setProgressMap] = useState<Record<string, { 
+    progress_pct: number, 
+    completed_at: string | null 
+  }>>({});
 
-  // Buscar todos os treinamentos da empresa
+  // Buscar todos os treinamentos da empresa e o progresso do usuário
   useEffect(() => {
     fetchTrainings();
   }, []);
@@ -58,6 +65,8 @@ const TrainingsList = () => {
   const fetchTrainings = async () => {
     try {
       setLoading(true);
+      
+      // Fetch all trainings
       const { data, error } = await supabase
         .from("trainings")
         .select("*")
@@ -66,9 +75,53 @@ const TrainingsList = () => {
       if (error) {
         throw error;
       }
-
-      setTrainings(data || []);
-      setFilteredTrainings(data || []);
+      
+      // Fetch user progress if a user is logged in
+      if (user) {
+        try {
+          const progressData = await fetchUserTrainingProgress(user.id);
+          
+          // Create map of training_id to progress
+          const progMap: Record<string, { progress_pct: number, completed_at: string | null }> = {};
+          progressData.forEach((item: any) => {
+            progMap[item.training_id] = {
+              progress_pct: item.progress_pct || 0,
+              completed_at: item.completed_at
+            };
+          });
+          
+          setProgressMap(progMap);
+          
+          // Add status to each training based on the progress
+          const trainingsWithStatus = data?.map(training => {
+            const progress = progMap[training.id];
+            let status: TrainingStatus = "not_started";
+            
+            if (progress) {
+              if (progress.completed_at) {
+                status = "completed";
+              } else if (progress.progress_pct > 0) {
+                status = "in_progress";
+              }
+            }
+            
+            return {
+              ...training,
+              status
+            };
+          }) || [];
+          
+          setTrainings(trainingsWithStatus);
+          setFilteredTrainings(trainingsWithStatus);
+        } catch (progressError) {
+          console.error("Error fetching training progress:", progressError);
+          setTrainings(data || []);
+          setFilteredTrainings(data || []);
+        }
+      } else {
+        setTrainings(data || []);
+        setFilteredTrainings(data || []);
+      }
     } catch (error) {
       console.error("Erro ao buscar treinamentos:", error);
       toast({
@@ -110,9 +163,9 @@ const TrainingsList = () => {
           "bg-gray-200 text-gray-800"
         }`}
       >
-        {statusIcons[status as keyof typeof statusIcons] || statusIcons.not_started}
+        {statusIcons[status] || statusIcons.not_started}
         <span>
-          {statusLabels[status as keyof typeof statusLabels] || statusLabels.not_started}
+          {statusLabels[status] || statusLabels.not_started}
         </span>
       </Badge>
     );

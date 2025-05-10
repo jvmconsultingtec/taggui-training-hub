@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { AlertCircle, RefreshCcw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { refreshData } from "@/integrations/supabase/client";
+import { TrainingStatus } from "@/components/trainings/TrainingCard";
 
 type Assignment = {
   id: string;
@@ -130,7 +131,7 @@ const Dashboard = () => {
   });
 
   // Get status for a training
-  const getTrainingStatus = (trainingId: string) => {
+  const getTrainingStatus = (trainingId: string): TrainingStatus => {
     const progress = progressMap[trainingId];
     if (!progress) return "not_started";
     if (progress.completed_at) return "completed";
@@ -194,14 +195,19 @@ const Dashboard = () => {
             <div className="text-center py-8">Carregando treinamentos...</div>
           ) : trainings.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {trainings.map((assignment) => (
-                <TrainingCard 
-                  key={assignment.id} 
-                  training={assignment.training}
-                  status={getTrainingStatus(assignment.training.id)}
-                  progress={getTrainingProgress(assignment.training.id)}
-                />
-              ))}
+              {trainings.map((assignment) => {
+                const status = getTrainingStatus(assignment.training.id);
+                const progress = getTrainingProgress(assignment.training.id);
+                
+                return (
+                  <TrainingCard 
+                    key={assignment.id} 
+                    training={assignment.training}
+                    status={status}
+                    progress={progress}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">

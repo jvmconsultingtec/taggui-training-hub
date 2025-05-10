@@ -54,11 +54,11 @@ const TrainingCard = (props: TrainingCardProps) => {
     video_url = props.video_url || props.training?.video_url,
     video_type = props.video_type || props.training?.video_type,
     progress = 0,
-    status = props.training?.status || "not_started",
+    status = props.status || props.training?.status || "not_started",
     thumbnailUrl
   } = props;
 
-  // Calculate progress bar width - ensure it's always accurate
+  // Calculate progress bar width based on status
   const progressWidth = status === "completed" ? 100 : 
                        status === "in_progress" ? (progress || 50) : 0;
 
