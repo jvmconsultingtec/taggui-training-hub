@@ -29,7 +29,7 @@ const checkAuth = async () => {
 };
 
 // Helper function for basic error handling
-const handleError = (error: any, message: string) => {
+const handleError = (error: unknown, message: string): never => {
   console.error(`${message} Details:`, error);
   
   // Show toast with error message
@@ -440,7 +440,7 @@ export const updateTrainingProgress = async (trainingId: string, userId: string,
     }
     
     // Prepare data for update or create
-    const updates: any = {
+    const updates: Partial<TrainingProgress> = {
       progress_pct: progressPct,
       last_viewed_at: new Date().toISOString(),
     };
