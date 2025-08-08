@@ -72,6 +72,14 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
             setTimeout(() => {
               if (mounted) {
                 checkAdminStatus(currentSession.user);
+                // Garantir que o perfil do usuário exista na tabela public.users
+                (async () => {
+                  try {
+                    await supabase.rpc('ensure_user_profile');
+                  } catch (e) {
+                    console.error('Erro ao garantir perfil do usuário:', e);
+                  }
+                })();
               }
             }, 100);
           } else {
@@ -99,6 +107,8 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (data.session && mounted) {
           setSession(data.session);
           setUser(data.session.user);
+          // Garantir que o perfil do usuário exista
+          try { await supabase.rpc('ensure_user_profile'); } catch (e) { console.error('Erro ao garantir perfil do usuário:', e); }
           
           // Verificar status de admin
           await checkAdminStatus(data.session.user);

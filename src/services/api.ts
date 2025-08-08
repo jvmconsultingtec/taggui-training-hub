@@ -42,71 +42,18 @@ const handleError = (error: unknown, message: string): never => {
   throw error;
 };
 
-// Helper function to create the training_videos bucket if it doesn't exist
+// Helper function to verify storage availability (no creation from client)
 export const ensureTrainingVideosBucket = async () => {
   try {
-    // Check if bucket exists
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error("Error checking buckets:", bucketsError);
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    if (error) {
+      console.error("Error listing buckets:", error);
       return;
     }
-    
-    console.log("Available buckets:", buckets);
-    
-    // Check for both variations of the bucket name
-    const bucketExists = buckets?.some(bucket => 
-      bucket.name === 'training_videos' || bucket.name === 'training-videos'
-    );
-    
-    if (!bucketExists) {
-      // Create bucket - try with hyphen format as that seems to be working better
-      console.log("Bucket not found, creating it...");
-      const { data, error } = await supabase.storage.createBucket('training-videos', {
-        public: true,
-        fileSizeLimit: 52428800, // 50MB
-      });
-      
-      if (error) {
-        console.error("Error creating bucket:", error);
-      } else {
-        console.log("Created bucket:", data);
-      }
-    } else {
-      console.log("Bucket already exists");
-      
-      // Update bucket to ensure it's public
-      try {
-        // Try both naming formats since we're not sure which one exists
-        const { error: updateError } = await supabase.storage.updateBucket('training-videos', {
-          public: true,
-          fileSizeLimit: 52428800, // 50MB
-        });
-        
-        if (updateError) {
-          console.error("Error updating bucket with hyphen to public:", updateError);
-          
-          // Try with underscore naming
-          const { error: updateError2 } = await supabase.storage.updateBucket('training_videos', {
-            public: true,
-            fileSizeLimit: 52428800, // 50MB
-          });
-          
-          if (updateError2) {
-            console.error("Error updating bucket with underscore to public:", updateError2);
-          } else {
-            console.log("Updated training_videos bucket to be public");
-          }
-        } else {
-          console.log("Updated training-videos bucket to be public");
-        }
-      } catch (err) {
-        console.error("Error updating bucket:", err);
-      }
-    }
-  } catch (error) {
-    console.error("Error checking/creating bucket:", error);
+    console.log("Available buckets:", buckets?.map(b => b.name));
+    // Note: Bucket creation/update requires service role; handled via infra, not client.
+  } catch (e) {
+    console.error("Error checking storage buckets:", e);
   }
 };
 
@@ -619,5 +566,3 @@ export const uploadTrainingVideo = async (file: File) => {
   }
 };
 
-// Call ensureTrainingVideosBucket on module import to make sure the bucket exists
-ensureTrainingVideosBucket();

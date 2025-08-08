@@ -367,9 +367,6 @@ const Reports = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">{engagementData.averageCompletionTime.toFixed(1)} dias</div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {engagementData.previousTimeComparison}% mais rápido que o mês anterior
-                        </p>
                       </CardContent>
                     </Card>
                     
@@ -381,9 +378,6 @@ const Reports = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">{engagementData.completionRate}%</div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {engagementData.previousRateComparison}% maior que o mês anterior
-                        </p>
                       </CardContent>
                     </Card>
                     
